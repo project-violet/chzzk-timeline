@@ -30,6 +30,8 @@ const GLASS_CARD_STYLE = {
 export function Sidebar({ data, selectedChannel, handleChannelSearch }) {
   if (!data) return null;
 
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
   const nameIdMap = useMemo(
     () => new Map(data.nodes.map((node) => [node.name, node.id])),
     [data]
@@ -110,7 +112,13 @@ export function Sidebar({ data, selectedChannel, handleChannelSearch }) {
           </Stack>
         </Paper>
 
-        {relatedChannels.length > 0 ? <RelatedChannels relatedChannels={relatedChannels} /> : null}
+        {relatedChannels.length > 0 ? (
+          <RelatedChannels
+            relatedChannels={relatedChannels}
+            collapsed={isCollapsed}
+            onToggle={() => setIsCollapsed((prev) => !prev)}
+          />
+        ) : null}
       </Stack>
     </aside>
   );
@@ -159,7 +167,7 @@ const columns = [
   }),
 ];
 
-function RelatedChannels({ relatedChannels }) {
+function RelatedChannels({ relatedChannels, collapsed, onToggle }) {
   const [pagination, setPagination] = useState({
     pageIndex: 0,
     pageSize: 10,
@@ -183,85 +191,96 @@ function RelatedChannels({ relatedChannels }) {
   return (
     <Paper radius="xl" shadow="xl" p="lg" withBorder visibleFrom="sm" style={GLASS_CARD_STYLE}>
       <Stack gap="md">
-        <Group justify="space-between" align="flex-start">
-          <div>
-            <Title order={4}>연관 채널</Title>
-            <Text size="xs" c="dimmed">
-              총 {relatedChannels.length.toLocaleString()}개의 채널이 연결되어 있습니다.
-            </Text>
-          </div>
-          <Badge color="teal" variant="light" radius="md">
-            실시간 분석
-          </Badge>
-        </Group>
-
-        <ScrollArea h={420} type="auto" offsetScrollbars>
-          <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md" striped>
-            <Table.Thead>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <Table.Tr key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => {
-                    const width = header.column.columnDef.meta?.width;
-
-                    if (!header.column.getCanSort()) {
-                      return (
-                        <Table.Th key={header.id} style={{ width, textAlign: header.column.id === 'index' ? 'center' : undefined }}>
-                          <Text size="xs" tt="uppercase" fw={600} c="dimmed" ta={header.column.id === 'index' ? 'center' : undefined}>
-                            {header.column.columnDef.header}
-                          </Text>
-                        </Table.Th>
-                      );
-                    }
-
-                    const sortState = header.column.getIsSorted();
-                    const toggleSort = header.column.getToggleSortingHandler();
-
-                    return (
-                      <Table.Th key={header.id} style={{ width }}>
-                        <UnstyledButton onClick={toggleSort} style={{ width: '100%' }}>
-                          <Group justify="space-between" gap="xs">
-                            <Text size="xs" tt="uppercase" fw={600} c={sortState ? 'teal.5' : 'dimmed'}>
-                              {header.column.columnDef.header}
-                            </Text>
-                            <Text size="xs" c="dimmed">
-                              {sortState === 'desc' ? '▼' : sortState === 'asc' ? '▲' : '↕'}
-                            </Text>
-                          </Group>
-                        </UnstyledButton>
-                      </Table.Th>
-                    );
-                  })}
-                </Table.Tr>
-              ))}
-            </Table.Thead>
-            <Table.Tbody>
-              {table.getRowModel().rows.map((row) => (
-                <Table.Tr key={row.id}>
-                  {row.getVisibleCells().map((cell) => {
-                    const width = cell.column.columnDef.meta?.width;
-                    return (
-                      <Table.Td key={cell.id} style={{ width, textAlign: cell.column.id === 'index' ? 'center' : undefined }}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </Table.Td>
-                    );
-                  })}
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
-        </ScrollArea>
-
-        <Group justify="space-between" gap="sm">
-          <Text size="xs" c="dimmed">
-            페이지 {currentPage} / {totalPages}
-          </Text>
-          <Group gap="xs">
-            <PageButton onClick={() => table.firstPage()} disabled={!table.getCanPreviousPage()}>{'<<'}</PageButton>
-            <PageButton onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>{'<'}</PageButton>
-            <PageButton onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>{'>'}</PageButton>
-            <PageButton onClick={() => table.lastPage()} disabled={!table.getCanNextPage()}>{'>>'}</PageButton>
+        <UnstyledButton onClick={onToggle} style={{ width: '100%' }}>
+          <Group justify="space-between" align="flex-start">
+            <div>
+              <Title order={4}>연관 채널</Title>
+              <Text size="xs" c="dimmed">
+                총 {relatedChannels.length.toLocaleString()}개의 채널이 연결되어 있습니다.
+              </Text>
+            </div>
+            <Group gap="xs" align="center">
+              <Badge color="teal" variant="light" radius="md">
+                실시간 분석
+              </Badge>
+              <Text size="sm" fw={600} c="dimmed">
+                {collapsed ? '▲' : '▼'}
+              </Text>
+            </Group>
           </Group>
-        </Group>
+        </UnstyledButton>
+
+        {!collapsed ? (
+          <>
+            <ScrollArea h={420} type="auto" offsetScrollbars>
+              <Table highlightOnHover verticalSpacing="sm" horizontalSpacing="md" striped>
+                <Table.Thead>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <Table.Tr key={headerGroup.id}>
+                      {headerGroup.headers.map((header) => {
+                        const width = header.column.columnDef.meta?.width;
+
+                        if (!header.column.getCanSort()) {
+                          return (
+                            <Table.Th key={header.id} style={{ width, textAlign: header.column.id === 'index' ? 'center' : undefined }}>
+                              <Text size="xs" tt="uppercase" fw={600} c="dimmed" ta={header.column.id === 'index' ? 'center' : undefined}>
+                                {header.column.columnDef.header}
+                              </Text>
+                            </Table.Th>
+                          );
+                        }
+
+                        const sortState = header.column.getIsSorted();
+                        const toggleSort = header.column.getToggleSortingHandler();
+
+                        return (
+                          <Table.Th key={header.id} style={{ width }}>
+                            <UnstyledButton onClick={toggleSort} style={{ width: '100%' }}>
+                              <Group justify="space-between" gap="xs">
+                                <Text size="xs" tt="uppercase" fw={600} c={sortState ? 'teal.5' : 'dimmed'}>
+                                  {header.column.columnDef.header}
+                                </Text>
+                                <Text size="xs" c="dimmed">
+                                  {sortState === 'desc' ? '▼' : sortState === 'asc' ? '▲' : '↕'}
+                                </Text>
+                              </Group>
+                            </UnstyledButton>
+                          </Table.Th>
+                        );
+                      })}
+                    </Table.Tr>
+                  ))}
+                </Table.Thead>
+                <Table.Tbody>
+                  {table.getRowModel().rows.map((row) => (
+                    <Table.Tr key={row.id}>
+                      {row.getVisibleCells().map((cell) => {
+                        const width = cell.column.columnDef.meta?.width;
+                        return (
+                          <Table.Td key={cell.id} style={{ width, textAlign: cell.column.id === 'index' ? 'center' : undefined }}>
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </Table.Td>
+                        );
+                      })}
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </ScrollArea>
+
+            <Group justify="space-between" gap="sm">
+              <Text size="xs" c="dimmed">
+                페이지 {currentPage} / {totalPages}
+              </Text>
+              <Group gap="xs">
+                <PageButton onClick={() => table.firstPage()} disabled={!table.getCanPreviousPage()}>{'<<'}</PageButton>
+                <PageButton onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>{'<'}</PageButton>
+                <PageButton onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>{'>'}</PageButton>
+                <PageButton onClick={() => table.lastPage()} disabled={!table.getCanNextPage()}>{'>>'}</PageButton>
+              </Group>
+            </Group>
+          </>
+        ) : null}
       </Stack>
     </Paper>
   );
