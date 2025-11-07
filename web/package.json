@@ -7,6 +7,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@mantine/core": "^7.12.1",
+    "@mantine/hooks": "^7.12.1",
     "@tailwindcss/vite": "^4.0.1",
     "@tanstack/react-table": "^8.20.6",
     "d3": "^7.9.0",
