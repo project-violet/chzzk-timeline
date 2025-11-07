@@ -74,7 +74,7 @@ function RelatedChannels({ relatedChannels }) {
     onPaginationChange: setPagination,
     onSortingChange: setSorting,
   });
-  
+
   return (
     <div className='w-full border-3 p-2 border-gray-300 bg-white dark:bg-gray-600 hidden sm:block'>
       <table className='table-fixed w-full'>
