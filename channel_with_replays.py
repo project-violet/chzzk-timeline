@@ -96,7 +96,7 @@ def main() -> None:
     base_dir = Path(__file__).resolve().parent
     data_dir = base_dir / "data"
     replays_dir = data_dir / "replays"
-    summary_path = data_dir / "channel_with_replays.json"
+    summary_path = base_dir / "web" / "public" / "channel_with_replays.json"
 
     channels_path = base_dir / "channels.json"
     channels = load_channels(channels_path)

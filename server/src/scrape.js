@@ -18,9 +18,9 @@ export async function scanChannels() {
 
   lives.forEach((live) => db.insertChannel(live.channel));
 
-  lives = lives.filter((live) => !scrapingChannels.has(live.channel.channelId));
+  // lives = lives.filter((live) => !scrapingChannels.has(live.channel.channelId));
 
-  lives.forEach((live) => scrapeChats(live));
+  // lives.forEach((live) => scrapeChats(live));
 }
 
 function log(...args) {
