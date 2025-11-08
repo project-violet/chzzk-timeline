@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Container, Group, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Button, Container, Group, MultiSelect, Stack, Text, TextInput, Title } from '@mantine/core';
 import { StreamerFilter } from './StreamerFilter.jsx';
 import { TimelineTracks } from './TimelineTracks.jsx';
 
@@ -290,6 +290,8 @@ const TimelinePage = () => {
     const [filterText, setFilterText] = useState('');
     const [selectedChannelIds, setSelectedChannelIds] = useState([]);
     const [replayTitleFilter, setReplayTitleFilter] = useState('');
+    const [selectedCategories, setSelectedCategories] = useState([]);
+    const [selectedTags, setSelectedTags] = useState([]);
 
     const filteredTimeline = useMemo(() => {
         const text = filterText.trim().toLowerCase();
@@ -312,21 +314,91 @@ const TimelinePage = () => {
         [replayTitleFilter]
     );
 
+    const { categoryOptions, tagOptions } = useMemo(() => {
+        const categoryCounter = new Map();
+        const tagCounter = new Map();
+
+        timelineData.forEach((channel) => {
+            channel.replays.forEach((replay) => {
+                const category = (replay?.categoryKo ?? '').trim();
+                if (category) {
+                    categoryCounter.set(category, (categoryCounter.get(category) ?? 0) + 1);
+                }
+                if (Array.isArray(replay?.tags)) {
+                    replay.tags
+                        .map((tag) => (typeof tag === 'string' ? tag.trim() : ''))
+                        .filter(Boolean)
+                        .forEach((tag) => {
+                            tagCounter.set(tag, (tagCounter.get(tag) ?? 0) + 1);
+                        });
+                }
+            });
+        });
+
+        const categories = Array.from(categoryCounter.entries())
+            .map(([value, count]) => ({ value, count }))
+            .sort((a, b) => {
+                if (b.count !== a.count) return b.count - a.count;
+                return a.value.localeCompare(b.value, 'ko-KR');
+            })
+            .map(({ value, count }) => ({
+                value,
+                label: `${value} (${count.toLocaleString('ko-KR')}개)`,
+            }));
+
+        const tags = Array.from(tagCounter.entries())
+            .map(([value, count]) => ({ value, count }))
+            .sort((a, b) => {
+                if (b.count !== a.count) return b.count - a.count;
+                return a.value.localeCompare(b.value, 'ko-KR');
+            })
+            .map(({ value, count }) => ({
+                value,
+                label: `${value} (${count.toLocaleString('ko-KR')}개)`,
+            }));
+
+        return { categoryOptions: categories, tagOptions: tags };
+    }, [timelineData]);
+
     const replayFilteredTimeline = useMemo(() => {
-        if (replayKeywords.length === 0) return filteredTimeline;
+        const categorySet = new Set(selectedCategories.map((item) => item.trim()).filter(Boolean));
+        const tagList = selectedTags.map((item) => item.trim()).filter(Boolean);
+        const requireCategory = categorySet.size > 0;
+        const requireTags = tagList.length > 0;
+
+        if (
+            replayKeywords.length === 0 &&
+            !requireCategory &&
+            !requireTags
+        ) {
+            return filteredTimeline;
+        }
 
         return filteredTimeline
             .map((channel) => {
                 const matchingReplays = channel.replays.filter((replay) => {
                     const title = (replay?.title ?? '').toLowerCase();
-                    return replayKeywords.every((keyword) => title.includes(keyword));
+                    if (!replayKeywords.every((keyword) => title.includes(keyword))) return false;
+
+                    if (requireCategory) {
+                        const categoryValue = (replay?.categoryKo ?? '').trim();
+                        if (!categorySet.has(categoryValue)) return false;
+                    }
+
+                    if (requireTags) {
+                        if (!Array.isArray(replay?.tags)) return false;
+                        const normalizedTags = replay.tags.map((tag) => (typeof tag === 'string' ? tag.trim() : '')).filter(Boolean);
+                        return tagList.every((tag) => normalizedTags.includes(tag));
+                    }
+
+                    return true;
                 });
 
                 if (matchingReplays.length === 0) return null;
                 return { ...channel, replays: matchingReplays };
             })
             .filter(Boolean);
-    }, [filteredTimeline, replayKeywords]);
+    }, [filteredTimeline, replayKeywords, selectedCategories, selectedTags]);
 
     const sidebarChannels = useMemo(() => {
         const text = filterText.trim().toLowerCase();
@@ -344,7 +416,7 @@ const TimelinePage = () => {
 
     useEffect(() => {
         setVisibleCount(TIMELINE_BATCH);
-    }, [filterText, selectedChannelIds, replayKeywords]);
+    }, [filterText, selectedChannelIds, replayKeywords, selectedCategories, selectedTags]);
 
     const viewSpan = Math.max(viewRange.end - viewRange.start, MIN_VIEW_SPAN);
     const tickConfig = useMemo(() => getTickConfig(viewSpan), [viewSpan]);
@@ -377,7 +449,11 @@ const TimelinePage = () => {
 
     const canLoadMore = visibleCount < replayFilteredTimeline.length;
     const isFilterActive =
-        filterText.trim().length > 0 || selectedChannelIds.length > 0 || replayTitleFilter.trim().length > 0;
+        filterText.trim().length > 0 ||
+        selectedChannelIds.length > 0 ||
+        replayTitleFilter.trim().length > 0 ||
+        selectedCategories.length > 0 ||
+        selectedTags.length > 0;
     const selectedCount = selectedChannelIds.length;
 
     const resetView = useCallback(() => {
@@ -388,6 +464,8 @@ const TimelinePage = () => {
         setFilterText('');
         setSelectedChannelIds([]);
         setReplayTitleFilter('');
+        setSelectedCategories([]);
+        setSelectedTags([]);
     };
 
     const toggleChannelSelection = (id) => {
@@ -448,27 +526,59 @@ const TimelinePage = () => {
                                 </Button>
                             </Group>
                         </Group>
-                        <Group align="flex-end" gap="sm" wrap="wrap">
-                            <TextInput
-                                label="방제 키워드 필터"
-                                placeholder="쉼표(,)로 구분된 키워드를 모두 포함하는 리플레이만 표시"
-                                value={replayTitleFilter}
-                                onChange={(event) => setReplayTitleFilter(event.currentTarget.value)}
-                                radius="lg"
-                                size="sm"
-                                className="w-full max-w-xl"
-                            />
-                            <Button
-                                variant="subtle"
-                                color="gray"
-                                radius="lg"
-                                size="xs"
-                                onClick={() => setReplayTitleFilter('')}
-                                disabled={replayKeywords.length === 0}
-                            >
-                                키워드 초기화
-                            </Button>
-                        </Group>
+                        <Stack gap="xs" className="w-full">
+                            <Group align="flex-end" gap="sm" wrap="wrap">
+                                <TextInput
+                                    label="방제 키워드 필터"
+                                    placeholder="쉼표(,)로 구분된 키워드를 모두 포함하는 리플레이만 표시"
+                                    value={replayTitleFilter}
+                                    onChange={(event) => setReplayTitleFilter(event.currentTarget.value)}
+                                    radius="lg"
+                                    size="sm"
+                                    className="w-full max-w-xl"
+                                />
+                                <Button
+                                    variant="subtle"
+                                    color="gray"
+                                    radius="lg"
+                                    size="xs"
+                                    onClick={() => setReplayTitleFilter('')}
+                                    disabled={replayKeywords.length === 0}
+                                >
+                                    키워드 초기화
+                                </Button>
+                            </Group>
+                            <Group align="flex-end" gap="sm" wrap="wrap">
+                                <MultiSelect
+                                    data={categoryOptions}
+                                    value={selectedCategories}
+                                    onChange={setSelectedCategories}
+                                    label="카테고리 필터"
+                                    placeholder="카테고리를 선택하세요"
+                                    searchable
+                                    clearable
+                                    radius="lg"
+                                    size="sm"
+                                    className="w-full max-w-xl"
+                                    nothingFoundMessage="일치하는 카테고리가 없습니다."
+                                    maxDropdownHeight={280}
+                                />
+                                <MultiSelect
+                                    data={tagOptions}
+                                    value={selectedTags}
+                                    onChange={setSelectedTags}
+                                    label="태그 필터"
+                                    placeholder="태그를 선택하세요"
+                                    searchable
+                                    clearable
+                                    radius="lg"
+                                    size="sm"
+                                    className="w-full max-w-xl"
+                                    nothingFoundMessage="일치하는 태그가 없습니다."
+                                    maxDropdownHeight={280}
+                                />
+                            </Group>
+                        </Stack>
 
                         <Text size="xs" c="dimmed">
                             좌측 필터에서 스트리머를 선택하거나 검색할 수 있습니다. 시간축(회색 영역)을 드래그하면 확대, 타임라인 영역을 드래그하면 이동하며 Shift+드래그도 확대 기능으로 동작합니다. 더블클릭 시 전체 범위로 복귀합니다. 아래 키워드 필터를 사용하면 입력한 모든 키워드를 포함한 방송 제목만 표시됩니다.
