@@ -4,7 +4,7 @@ import json
 import time
 from pathlib import Path
 
-from list_replays import ChzzkAPIError, list_replays, save_json
+from list_replays import ChzzkAPIError, list_replays_all, save_json
 
 
 def load_channels(path: Path) -> list[dict]:
@@ -32,7 +32,7 @@ def main() -> None:
             continue
 
         try:
-            replays = list_replays(channel_id, page=0, size=50)
+            replays = list_replays_all(channel_id, size=50)
         except ChzzkAPIError as err:
             print(f"⚠️  재생목록을 가져오지 못했습니다 ({channel_name}): {err}")
             continue

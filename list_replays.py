@@ -66,8 +66,7 @@ def resolve_channel_id(query: str) -> str:
     return channel_id
 
 
-def list_replays(channel: str, page: int = 0, size: int = 30):
-    channel_id = resolve_channel_id(channel)
+def _fetch_replays_page(channel_id: str, page: int = 0, size: int = 30):
     url = f"{BASE}/service/v1/channels/{channel_id}/videos"
     params = {
         "sortType": "LATEST",
@@ -108,6 +107,72 @@ def list_replays(channel: str, page: int = 0, size: int = 30):
     return result
 
 
+def list_replays(channel: str, page: int = 0, size: int = 30):
+    channel_id = resolve_channel_id(channel)
+    return _fetch_replays_page(channel_id, page=page, size=size)
+
+
+def list_replays_all(
+    channel: str,
+    size: int = 30,
+    start_page: int = 0,
+    max_pages: int | None = None,
+    delay: float = 0.0,
+):
+    """
+    더 이상 항목이 없을 때까지 페이지를 탐색하며 모든 리플레이를 수집합니다.
+
+    Args:
+        channel: 채널 ID, 핸들, 또는 채널 URL
+        size: 페이지당 아이템 수
+        start_page: 시작 페이지 (기본값 0)
+        max_pages: 최대 탐색 페이지 수 (None이면 제한 없음)
+        delay: 각 요청 간 대기 시간(초)
+    """
+
+    channel_id = resolve_channel_id(channel)
+    page = start_page
+    fetched_pages = 0
+    all_videos = []
+    total_pages = None
+    total_count = None
+
+    while True:
+        result = _fetch_replays_page(channel_id, page=page, size=size)
+        videos = result.get("videos", [])
+
+        if total_pages is None:
+            total_pages = result.get("totalPages")
+        if total_count is None:
+            total_count = result.get("totalCount")
+
+        if not videos:
+            break
+
+        all_videos.extend(videos)
+        fetched_pages += 1
+        page += 1
+
+        if max_pages is not None and fetched_pages >= max_pages:
+            break
+
+        if total_pages is not None and page >= total_pages:
+            break
+
+        if delay:
+            time.sleep(delay)
+
+    return {
+        "channelId": channel_id,
+        "page": start_page,
+        "size": size,
+        "fetchedPages": fetched_pages,
+        "totalPages": total_pages,
+        "totalCount": total_count if total_count is not None else len(all_videos),
+        "videos": all_videos,
+    }
+
+
 def save_json(data, filename: str):
     """결과를 JSON 파일로 저장"""
     with open(filename, "w", encoding="utf-8") as f:
@@ -117,8 +182,9 @@ def save_json(data, filename: str):
 
 if __name__ == "__main__":
     # 예시: 치지직 방송인 "a7e175625fdea5a7d98428302b7aa57f"
-    channel = "a6c4ddb09cdb160478996007bff35296"
-    out = list_replays(channel, page=0, size=50)
+    # channel = "a6c4ddb09cdb160478996007bff35296"
+    channel = "ac6a03808bffbe58b3bfb0e25271836e"
+    out = list_replays_all(channel, size=50, delay=0.2)
 
     # JSON으로 저장
     save_json(out, f"{channel}_replays.json")
