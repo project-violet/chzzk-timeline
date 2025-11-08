@@ -39,7 +39,7 @@ def main() -> None:
 
         output_path = output_dir / f"{channel_id}_replays.json"
         save_json(replays, str(output_path))
-        time.sleep(0.5)
+        # time.sleep(0.5)
 
 
 if __name__ == "__main__":

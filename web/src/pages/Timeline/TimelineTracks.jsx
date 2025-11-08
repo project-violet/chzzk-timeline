@@ -187,6 +187,17 @@ const TimelineCanvas = ({
                     const width = Math.min(Math.max(rawWidth, MIN_SEGMENT_WIDTH_PERCENT), maxWidth);
                     const top = rowIndex * rowHeight + rowHeight / 2;
 
+                    const dateRangeLabel = formatDateRange(replay.startDate, replay.endDate);
+                    const durationLabel = formatDuration(replay.durationMs);
+                    const categoryLabel = replay.categoryKo ? `카테고리 ${replay.categoryKo}` : null;
+                    const tagsLabel =
+                        Array.isArray(replay.tags) && replay.tags.length > 0
+                            ? `태그 ${replay.tags.filter(Boolean).join(', ')}`
+                            : null;
+                    const ariaLabel = [replay.title, dateRangeLabel, durationLabel, categoryLabel, tagsLabel]
+                        .filter(Boolean)
+                        .join(' · ');
+
                     return (
                         <a
                             key={`${channel.channelId ?? channel.name}-${index}-${replay.startDate.toISOString()}`}
@@ -197,7 +208,7 @@ const TimelineCanvas = ({
                                 top,
                             }}
                             tabIndex={0}
-                            aria-label={`${replay.title} · ${formatDateRange(replay.startDate, replay.endDate)}${formatDuration(replay.durationMs) ? ` · ${formatDuration(replay.durationMs)}` : ''}`}
+                            aria-label={ariaLabel}
                             onMouseEnter={(event) => showTooltip(event, channel, replay)}
                             onFocus={(event) => showTooltip(event, channel, replay)}
                             onMouseLeave={hideTooltip}
@@ -235,24 +246,41 @@ const TimelineTooltipOverlay = ({ tooltip, formatDateRange, formatDuration }) =>
                         <img
                             src={tooltip.replay.thumbnail}
                             alt={`${tooltip.replay.title} 썸네일`}
-                            className="h-40 w-72 flex-none rounded-xl border border-slate-800/60 object-cover shadow-inner shadow-slate-900/40 max-sm:w-full"
+                            className="h-52 w-80 flex-none rounded-2xl border border-slate-800/60 object-cover shadow-inner shadow-slate-900/40 max-sm:h-52 max-sm:w-full"
                             loading="lazy"
                         />
                     ) : null}
-                    <div className="min-w-0 space-y-1">
-                        <Text size="xs" c="dimmed" fw={600} className="uppercase tracking-wide">
+                    <div className="min-w-0 flex-1 space-y-2">
+                        <Text size="sm" c="dimmed" fw={600} className="uppercase tracking-wide">
                             {tooltip.channel.name}
                         </Text>
-                        <Text size="sm" fw={600} className="text-slate-100">
+                        <Text size="md" fw={600} className="text-slate-100">
                             {tooltip.replay.title}
                         </Text>
-                        <Text size="xs" c="dimmed">
+                        <Text size="sm" c="dimmed">
                             {formatDateRange(tooltip.replay.startDate, tooltip.replay.endDate)}
                         </Text>
                         {formatDuration(tooltip.replay.durationMs) ? (
-                            <Text size="xs" c="dimmed">
+                            <Text size="sm" c="dimmed">
                                 {formatDuration(tooltip.replay.durationMs)}
                             </Text>
+                        ) : null}
+                        {tooltip.replay.categoryKo ? (
+                            <Badge size="md" radius="md" variant="light" color="violet" className="inline-flex">
+                                {tooltip.replay.categoryKo}
+                            </Badge>
+                        ) : null}
+                        {Array.isArray(tooltip.replay.tags) && tooltip.replay.tags.length > 0 ? (
+                            <Group gap={8} wrap="wrap" mt={4}>
+                                {tooltip.replay.tags
+                                    .filter(Boolean)
+                                    .slice(0, 8)
+                                    .map((tag) => (
+                                        <Badge key={tag} size="md" radius="md" variant="light" color="gray">
+                                            #{tag}
+                                        </Badge>
+                                    ))}
+                            </Group>
                         ) : null}
                     </div>
                 </div>
@@ -339,8 +367,8 @@ export function TimelineTracks({
             const containerWidth = surfaceRect.width;
             if (containerWidth <= 0) return;
 
-            const availableWidth = Math.max(containerWidth - 16, 0);
-            const tooltipWidth = availableWidth >= 240 ? Math.min(availableWidth, 600) : availableWidth;
+            const availableWidth = Math.max(containerWidth - 8, 0);
+            const tooltipWidth = availableWidth >= 260 ? Math.min(availableWidth, 600) : availableWidth;
             if (tooltipWidth <= 0) {
                 setTooltip(null);
                 return;

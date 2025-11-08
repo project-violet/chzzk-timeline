@@ -93,6 +93,7 @@ def list_replays(channel: str, page: int = 0, size: int = 30):
                 "categoryKo": v.get("videoCategoryValue"),
                 "thumbnailUrl": v.get("thumbnailImageUrl"),
                 "videoType": v.get("videoType"),
+                "tags": v.get("tags"),
             }
         )
 
