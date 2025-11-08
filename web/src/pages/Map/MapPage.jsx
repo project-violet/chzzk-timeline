@@ -3,7 +3,7 @@ import * as d3 from 'd3';
 import { GraphContainer } from './Graph.jsx';
 import { Header } from './Header.jsx';
 import { Sidebar } from './Sidebar.jsx';
-import rawData from '../../../../server/data.json?raw';
+import rawData from '../../../../server/dd.json?raw';
 
 const data = JSON.parse(rawData);
 

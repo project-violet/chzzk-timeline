@@ -1,22 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import timelineRaw from '../../../../data/channel_with_replays.json?raw';
-import {
-    Avatar,
-    Badge,
-    Button,
-    Card,
-    Checkbox,
-    Container,
-    Group,
-    ScrollArea,
-    Stack,
-    Text,
-    TextInput,
-    Title,
-} from '@mantine/core';
+import { Button, Container, Group, Stack, Text, Title } from '@mantine/core';
+import { StreamerFilter } from './StreamerFilter.jsx';
+import { TimelineTracks } from './TimelineTracks.jsx';
 
 const TIMELINE_BATCH = 20;
-const MIN_SEGMENT_WIDTH_PERCENT = 0.6;
 const MIN_VIEW_SPAN = 5 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
@@ -96,12 +84,6 @@ const formatDuration = (durationMs) => {
     if (minutes > 0) parts.push(`${minutes}분`);
 
     return parts.join(' ') || '1분 미만';
-};
-
-const getInitials = (name = '') => {
-    const trimmed = name.trim();
-    if (!trimmed) return '?';
-    return trimmed.slice(0, 2);
 };
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
@@ -501,99 +483,16 @@ const TimelinePage = () => {
         <div className="min-h-screen bg-slate-950/95 pb-20 pt-28 text-slate-100">
             <Container size="100%">
                 <div className="grid gap-10 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
-                    <aside className="sticky top-24 self-start">
-                        <Card
-                            radius="xl"
-                            padding="lg"
-                            withBorder
-                            className="flex flex-col border border-slate-800/60 bg-slate-900/70 backdrop-blur"
-                            style={{ height: 'calc(100vh - 6rem)' }}
-                        >
-                            <Stack gap="sm" className="h-full">
-                                <div>
-                                    <Text size="sm" fw={700}>
-                                        스트리머 필터
-                                    </Text>
-                                    <Text size="xs" c="dimmed" mt={4}>
-                                        검색하거나 체크해 원하는 스트리머만 타임라인에 표시해 보세요.
-                                    </Text>
-                                </div>
-
-                                <TextInput
-                                    value={filterText}
-                                    onChange={(event) => setFilterText(event.currentTarget.value)}
-                                    placeholder="스트리머 검색"
-                                    radius="lg"
-                                    size="sm"
-                                    variant="filled"
-                                />
-
-                                <Group justify="space-between" align="center" gap="xs">
-                                    <Badge size="sm" radius="lg" variant="light" color={selectedCount ? 'teal' : 'gray'}>
-                                        선택 {selectedCount.toLocaleString('ko-KR')}명
-                                    </Badge>
-                                    <Group gap="xs">
-                                        <Button
-                                            variant="subtle"
-                                            color="gray"
-                                            size="xs"
-                                            radius="lg"
-                                            onClick={handleResetFilters}
-                                            disabled={!isFilterActive}
-                                        >
-                                            필터 초기화
-                                        </Button>
-                                    </Group>
-                                </Group>
-
-                                <ScrollArea style={{ flex: 1 }} type="auto" offsetScrollbars>
-                                    <Stack gap="xs" pr="sm">
-                                        {sidebarChannels.length === 0 ? (
-                                            <div className="flex h-32 items-center justify-center rounded-xl border border-slate-800/60 bg-slate-900/40">
-                                                <Text size="xs" c="dimmed">
-                                                    검색 결과가 없습니다.
-                                                </Text>
-                                            </div>
-                                        ) : (
-                                            sidebarChannels.map((channel) => {
-                                                const id = channel.channelId ?? channel.name;
-                                                const followerLabel = Number(channel.follower ?? 0).toLocaleString('ko-KR');
-                                                return (
-                                                    <Checkbox
-                                                        key={id}
-                                                        checked={selectedChannelIds.includes(id)}
-                                                        onChange={() => toggleChannelSelection(id)}
-                                                        radius="md"
-                                                        className="rounded-lg px-2 py-2 transition hover:bg-slate-800/50"
-                                                        styles={{
-                                                            input: { cursor: 'pointer' },
-                                                            label: { width: '100%' },
-                                                        }}
-                                                        label={
-                                                            <Group gap="sm" wrap="nowrap">
-                                                                <Avatar src={channel.image} radius="xl" size={32} alt={channel.name}>
-                                                                    {getInitials(channel.name)}
-                                                                </Avatar>
-                                                                <div className="min-w-0">
-                                                                    <Text size="sm" fw={600} className="truncate">
-                                                                        {channel.name}
-                                                                    </Text>
-                                                                    <Text size="xs" c="dimmed">
-                                                                        팔로워 {followerLabel}
-                                                                    </Text>
-                                                                </div>
-                                                            </Group>
-                                                        }
-                                                    />
-                                                );
-                                            })
-                                        )}
-                                    </Stack>
-                                </ScrollArea>
-                            </Stack>
-                        </Card>
-                    </aside>
-
+                    <StreamerFilter
+                        filterText={filterText}
+                        onFilterTextChange={setFilterText}
+                        sidebarChannels={sidebarChannels}
+                        selectedChannelIds={selectedChannelIds}
+                        onToggleChannel={toggleChannelSelection}
+                        onResetFilters={handleResetFilters}
+                        isFilterActive={isFilterActive}
+                        selectedCount={selectedCount}
+                    />
                     <Stack gap="xl">
                         <Group justify="space-between" align="flex-end">
                             <div>
@@ -633,163 +532,18 @@ const TimelinePage = () => {
                             onPointerCancel={finalizeInteraction}
                             onDoubleClick={handleResetView}
                         >
-                            <div className="sticky top-20 z-20 bg-slate-950/90 pb-3 pt-4 backdrop-blur">
-                                <div className="grid grid-cols-[220px_minmax(0,1fr)] items-end gap-4 text-xs text-slate-400">
-                                    <Text size="xs" fw={600} c="dimmed" className="uppercase tracking-wide">
-                                        Streamer
-                                    </Text>
-                                    <div ref={axisRef} className="relative h-12">
-                                        {selectionBox ? (
-                                            <div
-                                                className="pointer-events-none absolute inset-y-0 rounded-md bg-teal-400/10 ring-1 ring-teal-400/40"
-                                                style={{
-                                                    left: `${clamp(selectionBox.leftPercent, 0, 100)}%`,
-                                                    width: `${clamp(selectionBox.widthPercent, 0, 100)}%`,
-                                                }}
-                                            />
-                                        ) : null}
-                                        <div className="absolute bottom-0 left-0 right-0 border-b border-slate-800" />
-                                        {axisTicks.map((tick) => {
-                                            const position = ((tick.date.getTime() - viewRange.start) / viewSpan) * 100;
-                                            return (
-                                                <div
-                                                    key={tick.date.getTime()}
-                                                    className="absolute bottom-0 flex translate-x-[-50%] flex-col items-center"
-                                                    style={{ left: `${clamp(position, 0, 100)}%` }}
-                                                >
-                                                    <div className="h-3 w-px bg-slate-700" />
-                                                    <span className="mt-1 whitespace-nowrap text-[11px] text-slate-400">
-                                                        {tick.label}
-                                                    </span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {channelRows.length === 0 ? (
-                                <div className="flex h-40 items-center justify-center rounded-2xl border border-slate-800/60 bg-slate-900/60">
-                                    <Text size="sm" c="dimmed">
-                                        조건에 맞는 스트리머가 없습니다. 필터를 조정해 보세요.
-                                    </Text>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-[220px_minmax(0,1fr)] items-start gap-4">
-                                    <div className="overflow-hidden rounded-2xl border border-slate-800/70 bg-slate-900/60">
-                                        <div className="divide-y divide-slate-800/60">
-                                            {channelRows.map(({ channel }, index) => (
-                                                <Group
-                                                    key={channel.channelId ?? channel.name}
-                                                    gap="sm"
-                                                    wrap="nowrap"
-                                                    className="px-4"
-                                                    style={{ height: ROW_HEIGHT }}
-                                                >
-                                                    <Avatar
-                                                        src={channel.image}
-                                                        radius="xl"
-                                                        size={46}
-                                                        alt={channel.name}
-                                                        className="shadow-md ring-1 ring-slate-800/60"
-                                                    >
-                                                        {getInitials(channel.name)}
-                                                    </Avatar>
-                                                    <div className="min-w-0">
-                                                        <Text size="sm" fw={600} className="truncate">
-                                                            {channel.name}
-                                                        </Text>
-                                                        <Group gap={6} mt={4} wrap="wrap">
-                                                            <Badge size="sm" radius="lg" variant="light" color="teal">
-                                                                팔로워 {Number(channel.follower ?? 0).toLocaleString('ko-KR')}
-                                                            </Badge>
-                                                            <Badge size="sm" radius="lg" variant="light" color="blue">
-                                                                리플레이 {channel.replays.length.toLocaleString('ko-KR')}개
-                                                            </Badge>
-                                                        </Group>
-                                                    </div>
-                                                </Group>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div
-                                        className="relative overflow-hidden rounded-2xl border border-slate-800/70 bg-slate-900/60"
-                                        style={{ height: channelRows.length * ROW_HEIGHT }}
-                                    >
-                                        <div className="pointer-events-none absolute inset-0">
-                                            {selectionBox ? (
-                                                <div
-                                                    className="absolute inset-y-2 rounded-md bg-teal-300/6 ring-1 ring-teal-400/30"
-                                                    style={{
-                                                        left: `${clamp(selectionBox.leftPercent, 0, 100)}%`,
-                                                        width: `${clamp(selectionBox.widthPercent, 0, 100)}%`,
-                                                    }}
-                                                />
-                                            ) : null}
-                                            {axisTicks.map((tick) => {
-                                                const position = ((tick.date.getTime() - viewRange.start) / viewSpan) * 100;
-                                                return (
-                                                    <div
-                                                        key={`v-${tick.date.getTime()}`}
-                                                        className="absolute inset-y-0 border-l border-slate-800/40"
-                                                        style={{ left: `${clamp(position, 0, 100)}%` }}
-                                                    />
-                                                );
-                                            })}
-                                            {channelRows.map((_, rowIndex) => (
-                                                <div
-                                                    key={`h-${rowIndex}`}
-                                                    className="absolute left-0 right-0 border-t border-slate-800/35"
-                                                    style={{ top: rowIndex * ROW_HEIGHT }}
-                                                />
-                                            ))}
-                                            <div
-                                                className="absolute left-0 right-0 border-t border-slate-800/35"
-                                                style={{ top: channelRows.length * ROW_HEIGHT }}
-                                            />
-                                        </div>
-
-                                        {channelRows.map(({ channel, visibleReplays }, rowIndex) =>
-                                            visibleReplays.map((replay, index) => {
-                                                const start = replay.startDate.getTime();
-                                                const end = replay.endDate.getTime();
-                                                const startClamped = Math.max(start, viewRange.start);
-                                                const endClamped = Math.min(Math.max(end, startClamped), viewRange.end);
-                                                if (endClamped <= startClamped) return null;
-
-                                                const left = clamp(((startClamped - viewRange.start) / viewSpan) * 100, 0, 100);
-                                                const rawWidth = ((endClamped - startClamped) / viewSpan) * 100;
-                                                const maxWidth = Math.max(100 - left, 0);
-                                                const width = Math.min(Math.max(rawWidth, MIN_SEGMENT_WIDTH_PERCENT), maxWidth);
-                                                const top = rowIndex * ROW_HEIGHT + ROW_HEIGHT / 2;
-
-                                                return (
-                                                    <div
-                                                        key={`${channel.channelId ?? channel.name}-${index}-${replay.startDate.toISOString()}`}
-                                                        className="absolute flex h-6 -translate-y-1/2 items-center overflow-hidden rounded-full bg-teal-400/35 shadow-[0_0_0_1px_rgba(45,212,191,0.45)] backdrop-blur-sm transition hover:bg-teal-300/50"
-                                                        style={{
-                                                            left: `${left}%`,
-                                                            width: `${width}%`,
-                                                            top,
-                                                        }}
-                                                        title={`${replay.title}\n${formatDateRange(replay.startDate, replay.endDate)}${formatDuration(replay.durationMs) ? ` · ${formatDuration(replay.durationMs)}` : ''
-                                                            }`}
-                                                    >
-                                                        <Text
-                                                            size="xs"
-                                                            fw={600}
-                                                            className="w-full truncate px-3 text-teal-50 drop-shadow-[0_0_6px_rgba(15,118,110,0.4)]"
-                                                        >
-                                                            {replay.title}
-                                                        </Text>
-                                                    </div>
-                                                );
-                                            })
-                                        )}
-                                    </div>
-                                </div>
-                            )}
+                            <TimelineTracks
+                                axisRef={axisRef}
+                                axisTicks={axisTicks}
+                                channelRows={channelRows}
+                                selectionBox={selectionBox}
+                                viewRange={viewRange}
+                                viewSpan={viewSpan}
+                                rowHeight={ROW_HEIGHT}
+                                formatDateRange={formatDateRange}
+                                formatDuration={formatDuration}
+                                clamp={clamp}
+                            />
                         </div>
 
                         {canLoadMore ? (
