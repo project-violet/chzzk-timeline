@@ -19,35 +19,40 @@ const EmptyTimelinePlaceholder = () => (
 );
 
 const TimelineAxisHeader = ({ axisRef, selectionBox, axisTicks, viewRange, viewSpan, clamp }) => (
-    <div className="sticky top-20 z-20 bg-slate-950/90 pb-3 pt-4 backdrop-blur">
-        <div className="grid grid-cols-[220px_minmax(0,1fr)] items-end gap-4 text-xs text-slate-400">
-            <Text size="xs" fw={600} c="dimmed" className="uppercase tracking-wide">
-                Streamer
-            </Text>
-            <div ref={axisRef} className="relative h-12">
-                {selectionBox ? (
-                    <div
-                        className="pointer-events-none absolute inset-y-0 rounded-md bg-teal-400/10 ring-1 ring-teal-400/40"
-                        style={{
-                            left: `${clamp(selectionBox.leftPercent, 0, 100)}%`,
-                            width: `${clamp(selectionBox.widthPercent, 0, 100)}%`,
-                        }}
-                    />
-                ) : null}
-                <div className="absolute bottom-0 left-0 right-0 border-b border-slate-800" />
-                {axisTicks.map((tick) => {
-                    const position = ((tick.date.getTime() - viewRange.start) / viewSpan) * 100;
-                    return (
-                        <div
-                            key={tick.date.getTime()}
-                            className="absolute bottom-0 flex translate-x-[-50%] flex-col items-center"
-                            style={{ left: `${clamp(position, 0, 100)}%` }}
-                        >
-                            <div className="h-3 w-px bg-slate-700" />
-                            <span className="mt-1 whitespace-nowrap text-[11px] text-slate-400">{tick.label}</span>
-                        </div>
-                    );
-                })}
+    <div className="sticky top-20 z-20">
+        <div className="relative">
+            <div className="pointer-events-none absolute inset-x-0 -top-20 bottom-0 bg-slate-950/90 backdrop-blur" aria-hidden="true" />
+            <div className="relative pb-3 pt-4">
+                <div className="grid grid-cols-[220px_minmax(0,1fr)] items-end gap-4 text-xs text-slate-400">
+                    <Text size="xs" fw={600} c="dimmed" className="uppercase tracking-wide">
+                        Streamer
+                    </Text>
+                    <div ref={axisRef} className="relative h-12">
+                        {selectionBox ? (
+                            <div
+                                className="pointer-events-none absolute inset-y-0 rounded-md bg-teal-400/10 ring-1 ring-teal-400/40"
+                                style={{
+                                    left: `${clamp(selectionBox.leftPercent, 0, 100)}%`,
+                                    width: `${clamp(selectionBox.widthPercent, 0, 100)}%`,
+                                }}
+                            />
+                        ) : null}
+                        <div className="absolute bottom-0 left-0 right-0 border-b border-slate-800" />
+                        {axisTicks.map((tick) => {
+                            const position = ((tick.date.getTime() - viewRange.start) / viewSpan) * 100;
+                            return (
+                                <div
+                                    key={tick.date.getTime()}
+                                    className="absolute bottom-0 flex translate-x-[-50%] flex-col items-center"
+                                    style={{ left: `${clamp(position, 0, 100)}%` }}
+                                >
+                                    <div className="h-3 w-px bg-slate-700" />
+                                    <span className="mt-1 whitespace-nowrap text-[11px] text-slate-400">{tick.label}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
             </div>
         </div>
     </div>
