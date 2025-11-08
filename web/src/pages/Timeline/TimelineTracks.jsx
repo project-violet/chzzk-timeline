@@ -158,7 +158,7 @@ const TimelineCanvas = ({
                     return (
                         <div
                             key={`v-${tick.date.getTime()}`}
-                            className="absolute inset-y-0 border-l border-slate-800/40"
+                            className="absolute inset-y-0 border-l border-slate-800/30"
                             style={{ left: `${clamp(position, 0, 100)}%` }}
                         />
                     );
@@ -201,7 +201,7 @@ const TimelineCanvas = ({
                     return (
                         <a
                             key={`${channel.channelId ?? channel.name}-${index}-${replay.startDate.toISOString()}`}
-                            className="absolute flex h-6 -translate-y-1/2 cursor-pointer select-none items-center overflow-hidden rounded-full bg-teal-400/35 shadow-[0_0_0_1px_rgba(45,212,191,0.45)] backdrop-blur-sm transition hover:bg-teal-300/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-300/70"
+                            className="absolute flex h-6 -translate-y-1/2 cursor-pointer select-none items-center overflow-hidden rounded-full border border-teal-400/40 bg-teal-500/25 transition hover:bg-teal-400/45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-300/70"
                             style={{
                                 left: `${left}%`,
                                 width: `${width}%`,
@@ -240,7 +240,7 @@ const TimelineTooltipOverlay = ({ tooltip, formatDateRange, formatDuration }) =>
 
     return (
         <div className="pointer-events-none absolute z-30" style={{ left: tooltip.left, top: tooltip.top, width: tooltip.width }}>
-            <div className="overflow-hidden rounded-2xl border border-slate-800/80 bg-slate-900/95 p-4 shadow-xl shadow-slate-900/60 backdrop-blur">
+            <div className="overflow-hidden rounded-2xl border border-slate-800/70 bg-slate-900/95 p-4 shadow-lg shadow-slate-900/40">
                 <div className="flex gap-5 max-sm:flex-col">
                     {tooltip.replay.thumbnail ? (
                         <img

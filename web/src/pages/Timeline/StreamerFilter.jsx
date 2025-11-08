@@ -9,8 +9,7 @@ const DESKTOP_MEDIA_QUERY = '(min-width: 1024px)';
 const CARD_STYLE = {
     background: 'linear-gradient(155deg, rgba(15,23,42,0.92), rgba(30,41,59,0.88))',
     borderColor: 'rgba(45, 212, 191, 0.18)',
-    boxShadow: '0 24px 48px -24px rgba(13, 148, 136, 0.5)',
-    backdropFilter: 'blur(14px)',
+    boxShadow: '0 14px 32px -18px rgba(13, 148, 136, 0.4)',
 };
 
 const EMPTY_STATE_STYLE = {
