@@ -198,14 +198,17 @@ const TimelineCanvas = ({
                         .filter(Boolean)
                         .join(' · ');
 
+                    const hasRoomForPadding = width >= 3; // about 1% width ~ few px depending on span
+
                     return (
                         <a
                             key={`${channel.channelId ?? channel.name}-${index}-${replay.startDate.toISOString()}`}
-                            className="absolute flex h-6 -translate-y-1/2 cursor-pointer select-none items-center overflow-hidden rounded-full border border-teal-400/40 bg-teal-500/25 transition hover:bg-teal-400/45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-300/70"
+                            className="absolute flex h-6 -translate-y-1/2 cursor-pointer select-none items-center overflow-hidden rounded-full border border-teal-400/40 bg-gradient-to-r from-teal-500/40 via-teal-400/35 to-teal-500/40 transition hover:from-teal-400/55 hover:via-teal-300/55 hover:to-teal-400/55 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-300/70"
                             style={{
                                 left: `${left}%`,
                                 width: `${width}%`,
                                 top,
+                                boxShadow: '0 6px 14px -8px rgba(45, 212, 191, 0.45)',
                             }}
                             tabIndex={0}
                             aria-label={ariaLabel}
@@ -223,7 +226,12 @@ const TimelineCanvas = ({
                             <Text
                                 size="xs"
                                 fw={600}
-                                className="w-full truncate px-3 text-teal-50 drop-shadow-[0_0_6px_rgba(15,118,110,0.4)] select-none"
+                                className="w-full truncate text-teal-50"
+                                style={{
+                                    textShadow: '0 1px 2px rgba(15, 118, 110, 0.45)',
+                                    paddingLeft: hasRoomForPadding ? '8px' : '0px',
+                                    paddingRight: hasRoomForPadding ? '8px' : '0px',
+                                }}
                             >
                                 {replay.title}
                             </Text>
