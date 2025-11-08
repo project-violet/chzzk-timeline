@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge, Button, Container, Group, MultiSelect, Stack, Text, TextInput, Title } from '@mantine/core';
-import { DatePickerInput } from '@mantine/dates';
 import { StreamerFilter } from './StreamerFilter.jsx';
 import { TimelineTracks } from './TimelineTracks.jsx';
 
@@ -404,6 +403,16 @@ const TimelinePage = () => {
         };
     }, [timelineData]);
 
+    const applyPresetRange = useCallback(
+        (days) => {
+            const end = new Date();
+            let start = new Date(end.getTime() - days * DAY_MS);
+            setStartDateFilter(toDateInputValue(start));
+            setEndDateFilter(toDateInputValue(end));
+        },
+        []
+    );
+
     const [viewRange, setViewRange] = useState(() => ({
         start: bounds.minTime,
         end: bounds.maxTime,
@@ -759,47 +768,35 @@ const TimelinePage = () => {
                                 </Group>
                             </Stack>
 
-                            <Stack gap="xs" className="w-full max-w-xs">
-                                <DatePickerInput
-                                    type="range"
-                                    allowSingleDateInRange
-                                    popoverProps={{ withinPortal: true }}
-                                    label="기간 필터"
-                                    value={[
-                                        parseDateInputValue(startDateFilter, false),
-                                        parseDateInputValue(endDateFilter, false),
-                                    ]}
-                                    onChange={([start, end]) => {
-                                        setStartDateFilter(toDateInputValue(start ?? ''));
-                                        setEndDateFilter(toDateInputValue(end ?? ''));
-                                    }}
-                                    locale="ko"
-                                    valueFormat="YYYY-MM-DD"
-                                    className="text-xs"
-                                    size="sm"
-                                    radius="lg"
-                                    styles={{
-                                        input: {
-                                            backgroundColor: 'rgba(15, 23, 42, 0.7)',
-                                            borderColor: 'rgba(71, 85, 105, 0.7)',
-                                            color: '#E2E8F0',
-                                            fontWeight: 600,
-                                        },
-                                        label: { fontWeight: 600, color: '#CBD5F5' },
-                                    }}
-                                />
-                                <Group gap="xs" wrap="wrap">
+                            <Stack gap="xs" className="w-full max-w-sm">
+                                <div className="flex items-end gap-3">
+                                    <label className="flex flex-1 flex-col text-xs font-semibold text-slate-300">
+                                        <span>시작일</span>
+                                        <input
+                                            type="date"
+                                            value={startDateFilter}
+                                            onChange={(event) => setStartDateFilter(event.currentTarget.value)}
+                                            className="mt-1 rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 focus:border-teal-400 focus:outline-none"
+                                        />
+                                    </label>
+                                    <span className="pb-2 text-sm text-slate-400">~</span>
+                                    <label className="flex flex-1 flex-col text-xs font-semibold text-slate-300">
+                                        <span>종료일</span>
+                                        <input
+                                            type="date"
+                                            value={endDateFilter}
+                                            onChange={(event) => setEndDateFilter(event.currentTarget.value)}
+                                            className="mt-1 rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 focus:border-teal-400 focus:outline-none"
+                                        />
+                                    </label>
+                                </div>
+                                <Group gap="xs" wrap="nowrap">
                                     <Button
                                         variant="subtle"
                                         color="teal"
                                         radius="lg"
                                         size="xs"
-                                        onClick={() => {
-                                            const now = new Date();
-                                            const start = new Date(now.getTime() - 90 * DAY_MS);
-                                            setStartDateFilter(toDateInputValue(start));
-                                            setEndDateFilter(toDateInputValue(now));
-                                        }}
+                                        onClick={() => applyPresetRange(90)}
                                     >
                                         최근 3개월
                                     </Button>
@@ -808,12 +805,7 @@ const TimelinePage = () => {
                                         color="teal"
                                         radius="lg"
                                         size="xs"
-                                        onClick={() => {
-                                            const now = new Date();
-                                            const start = new Date(now.getTime() - 180 * DAY_MS);
-                                            setStartDateFilter(toDateInputValue(start));
-                                            setEndDateFilter(toDateInputValue(now));
-                                        }}
+                                        onClick={() => applyPresetRange(180)}
                                     >
                                         최근 6개월
                                     </Button>
@@ -822,14 +814,18 @@ const TimelinePage = () => {
                                         color="teal"
                                         radius="lg"
                                         size="xs"
-                                        onClick={() => {
-                                            const now = new Date();
-                                            const start = new Date(now.getTime() - 365 * DAY_MS);
-                                            setStartDateFilter(toDateInputValue(start));
-                                            setEndDateFilter(toDateInputValue(now));
-                                        }}
+                                        onClick={() => applyPresetRange(365)}
                                     >
                                         최근 1년
+                                    </Button>
+                                    <Button
+                                        variant="subtle"
+                                        color="gray"
+                                        radius="lg"
+                                        size="xs"
+                                        onClick={() => applyPresetRange(Infinity)}
+                                    >
+                                        전체 기간
                                     </Button>
                                 </Group>
                             </Stack>

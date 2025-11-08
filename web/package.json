@@ -8,11 +8,9 @@
   },
   "dependencies": {
     "@mantine/core": "^7.12.1",
-    "@mantine/dates": "^7.12.1",
     "@mantine/hooks": "^7.12.1",
     "@tailwindcss/vite": "^4.0.1",
     "@tanstack/react-table": "^8.20.6",
-    "dayjs": "^1.11.13",
     "@tanstack/react-virtual": "^3.5.0",
     "d3": "^7.9.0",
     "d3-force-3d": "^3.0.6",
