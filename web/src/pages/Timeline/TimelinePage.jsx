@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import timelineRaw from '../../../../data/channel_with_replays.json?raw';
-import { Button, Container, Group, Stack, Text, Title } from '@mantine/core';
+import { Button, Container, Group, Stack, Text, TextInput, Title } from '@mantine/core';
 import { StreamerFilter } from './StreamerFilter.jsx';
 import { TimelineTracks } from './TimelineTracks.jsx';
 
@@ -254,6 +254,7 @@ const TimelinePage = () => {
 
     const [filterText, setFilterText] = useState('');
     const [selectedChannelIds, setSelectedChannelIds] = useState([]);
+    const [replayTitleFilter, setReplayTitleFilter] = useState('');
 
     const filteredTimeline = useMemo(() => {
         const text = filterText.trim().toLowerCase();
@@ -266,6 +267,31 @@ const TimelinePage = () => {
             return matchesText && matchesSelection;
         });
     }, [timelineData, filterText, selectedChannelIds]);
+
+    const replayKeywords = useMemo(
+        () =>
+            replayTitleFilter
+                .split(',')
+                .map((keyword) => keyword.trim().toLowerCase())
+                .filter(Boolean),
+        [replayTitleFilter]
+    );
+
+    const replayFilteredTimeline = useMemo(() => {
+        if (replayKeywords.length === 0) return filteredTimeline;
+
+        return filteredTimeline
+            .map((channel) => {
+                const matchingReplays = channel.replays.filter((replay) => {
+                    const title = (replay?.title ?? '').toLowerCase();
+                    return replayKeywords.every((keyword) => title.includes(keyword));
+                });
+
+                if (matchingReplays.length === 0) return null;
+                return { ...channel, replays: matchingReplays };
+            })
+            .filter(Boolean);
+    }, [filteredTimeline, replayKeywords]);
 
     const sidebarChannels = useMemo(() => {
         const text = filterText.trim().toLowerCase();
@@ -283,7 +309,7 @@ const TimelinePage = () => {
 
     useEffect(() => {
         setVisibleCount(TIMELINE_BATCH);
-    }, [filterText, selectedChannelIds]);
+    }, [filterText, selectedChannelIds, replayKeywords]);
 
     const viewSpan = Math.max(viewRange.end - viewRange.start, MIN_VIEW_SPAN);
     const tickConfig = useMemo(() => getTickConfig(viewSpan), [viewSpan]);
@@ -297,8 +323,8 @@ const TimelinePage = () => {
     );
 
     const visibleChannels = useMemo(
-        () => filteredTimeline.slice(0, Math.min(visibleCount, filteredTimeline.length)),
-        [filteredTimeline, visibleCount]
+        () => replayFilteredTimeline.slice(0, Math.min(visibleCount, replayFilteredTimeline.length)),
+        [replayFilteredTimeline, visibleCount]
     );
 
     const channelRows = useMemo(
@@ -314,8 +340,9 @@ const TimelinePage = () => {
         [visibleChannels, viewRange.start, viewRange.end]
     );
 
-    const canLoadMore = visibleCount < filteredTimeline.length;
-    const isFilterActive = filterText.trim().length > 0 || selectedChannelIds.length > 0;
+    const canLoadMore = visibleCount < replayFilteredTimeline.length;
+    const isFilterActive =
+        filterText.trim().length > 0 || selectedChannelIds.length > 0 || replayTitleFilter.trim().length > 0;
     const selectedCount = selectedChannelIds.length;
 
     const resetView = useCallback(() => {
@@ -325,6 +352,7 @@ const TimelinePage = () => {
     const handleResetFilters = () => {
         setFilterText('');
         setSelectedChannelIds([]);
+        setReplayTitleFilter('');
     };
 
     const toggleChannelSelection = (id) => {
@@ -358,13 +386,13 @@ const TimelinePage = () => {
                         <Group justify="space-between" align="flex-end">
                             <div>
                                 <Title order={1} size={36} fw={800}>
-                                    스트리머 타임라인
+                                    치지직 타임라인
                                 </Title>
                                 <Text size="md" c="dimmed" mt={6}>
                                     팔로워 수 순으로 정렬된 스트리머 방송 시간을 하나의 축에서 비교해 보세요.
                                 </Text>
                                 <Text size="xs" c="dimmed" mt={6}>
-                                    현재 {filteredTimeline.length.toLocaleString('ko-KR')}명의 스트리머가 조건에 맞습니다.
+                                    현재 {replayFilteredTimeline.length.toLocaleString('ko-KR')}명의 스트리머가 조건에 맞습니다.
                                 </Text>
                             </div>
                             <Group gap="xs">
@@ -380,8 +408,30 @@ const TimelinePage = () => {
                                 </Button>
                             </Group>
                         </Group>
+                        <Group align="flex-end" gap="sm" wrap="wrap">
+                            <TextInput
+                                label="방제 키워드 필터"
+                                placeholder="쉼표(,)로 구분된 키워드를 모두 포함하는 리플레이만 표시"
+                                value={replayTitleFilter}
+                                onChange={(event) => setReplayTitleFilter(event.currentTarget.value)}
+                                radius="lg"
+                                size="sm"
+                                className="w-full max-w-xl"
+                            />
+                            <Button
+                                variant="subtle"
+                                color="gray"
+                                radius="lg"
+                                size="xs"
+                                onClick={() => setReplayTitleFilter('')}
+                                disabled={replayKeywords.length === 0}
+                            >
+                                키워드 초기화
+                            </Button>
+                        </Group>
+
                         <Text size="xs" c="dimmed">
-                            좌측 필터에서 스트리머를 선택하거나 검색할 수 있습니다. 시간축(회색 영역)을 드래그하면 확대, 타임라인 영역을 드래그하면 이동하며 Shift+드래그도 확대 기능으로 동작합니다. 더블클릭 시 전체 범위로 복귀합니다.
+                            좌측 필터에서 스트리머를 선택하거나 검색할 수 있습니다. 시간축(회색 영역)을 드래그하면 확대, 타임라인 영역을 드래그하면 이동하며 Shift+드래그도 확대 기능으로 동작합니다. 더블클릭 시 전체 범위로 복귀합니다. 아래 키워드 필터를 사용하면 입력한 모든 키워드를 포함한 방송 제목만 표시됩니다.
                         </Text>
 
                         <TimelineTracks

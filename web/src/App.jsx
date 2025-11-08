@@ -3,8 +3,8 @@ import MapPage from './pages/Map/MapPage.jsx';
 import TimelinePage from './pages/Timeline/TimelinePage.jsx';
 
 const navItems = [
-  { to: '/map', label: '스트리머 맵' },
-  { to: '/timeline', label: '스트리머 타임라인' },
+  { to: '/map', label: '치지직 맵' },
+  { to: '/timeline', label: '치지직 타임라인' },
 ];
 
 const App = () => {

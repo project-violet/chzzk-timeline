@@ -202,7 +202,9 @@ const TimelineCanvas = ({
                             onFocus={(event) => showTooltip(event, channel, replay)}
                             onMouseLeave={hideTooltip}
                             onBlur={hideTooltip}
-                            href={replay?.videoNo ? `https://chzzk.naver.com/video/${replay.videoNo}` : undefined}
+                            onClick={() => {
+                                window.open(`https://chzzk.naver.com/video/${replay.videoNo}`, '_blank');
+                            }}
                             target="_blank"
                             rel="noopener noreferrer"
                             data-timeline-link="true"

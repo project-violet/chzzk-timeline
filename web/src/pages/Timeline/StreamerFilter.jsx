@@ -166,8 +166,7 @@ export function StreamerFilter({
                             top: NAV_OFFSET,
                             left: metrics.left,
                             width: metrics.width,
-                            // height: FILTER_HEIGHT,
-                            height: `calc(100vh - 8rem)`,
+                            height: `calc(100vh - 7rem)`,
                         }}
                     >
                         <Card
