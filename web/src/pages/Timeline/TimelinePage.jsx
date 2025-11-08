@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import timelineRaw from '../../../../data/channel_with_replays.json?raw';
 import { Button, Container, Group, Stack, Text, Title } from '@mantine/core';
 import { StreamerFilter } from './StreamerFilter.jsx';
@@ -318,148 +318,9 @@ const TimelinePage = () => {
     const isFilterActive = filterText.trim().length > 0 || selectedChannelIds.length > 0;
     const selectedCount = selectedChannelIds.length;
 
-    const axisRef = useRef(null);
-    const surfaceRef = useRef(null);
-    const interactionRef = useRef(null);
-    const [selectionBox, setSelectionBox] = useState(null);
-
-    const enforceRange = (start, end) => {
-        let span = end - start;
-        if (!Number.isFinite(span) || span <= 0) {
-            span = MIN_VIEW_SPAN;
-            start = bounds.minTime;
-            end = bounds.minTime + span;
-        }
-
-        if (span < MIN_VIEW_SPAN) {
-            const center = start + span / 2;
-            span = MIN_VIEW_SPAN;
-            start = center - span / 2;
-            end = center + span / 2;
-        }
-
-        if (span > bounds.span) {
-            return { start: bounds.minTime, end: bounds.maxTime };
-        }
-
-        if (start < bounds.minTime) {
-            start = bounds.minTime;
-            end = start + span;
-        }
-        if (end > bounds.maxTime) {
-            end = bounds.maxTime;
-            start = end - span;
-        }
-
-        return { start, end };
-    };
-
-    const handlePointerDown = (event) => {
-        if (event.button !== 0) return;
-        const axisElement = axisRef.current;
-        if (!axisElement) return;
-
-        const rect = axisElement.getBoundingClientRect();
-        if (event.clientX < rect.left || event.clientX > rect.right) return;
-
-        event.preventDefault();
-        const pointerX = clamp(event.clientX - rect.left, 0, rect.width);
-        const isAxisArea = axisElement.contains(event.target);
-        const interactionType = event.shiftKey || isAxisArea ? 'select' : 'pan';
-
-        interactionRef.current = {
-            type: interactionType,
-            pointerId: event.pointerId,
-            startPx: pointerX,
-            viewRangeAtStart: { ...viewRange },
-        };
-
-        if (interactionType === 'select') {
-            setSelectionBox({
-                leftPercent: (pointerX / rect.width) * 100,
-                widthPercent: 0,
-            });
-        }
-
-        surfaceRef.current?.setPointerCapture(event.pointerId);
-    };
-
-    const handlePointerMove = (event) => {
-        const interaction = interactionRef.current;
-        if (!interaction || interaction.pointerId !== event.pointerId) return;
-
-        const axisElement = axisRef.current;
-        if (!axisElement) return;
-
-        const rect = axisElement.getBoundingClientRect();
-        const pointerX = clamp(event.clientX - rect.left, 0, rect.width);
-
-        if (interaction.type === 'pan') {
-            const span = interaction.viewRangeAtStart.end - interaction.viewRangeAtStart.start;
-            if (span <= 0) return;
-
-            const deltaPx = pointerX - interaction.startPx;
-            const deltaTime = (deltaPx / rect.width) * span;
-
-            const nextStart = interaction.viewRangeAtStart.start - deltaTime;
-            const nextEnd = interaction.viewRangeAtStart.end - deltaTime;
-            setViewRange(enforceRange(nextStart, nextEnd));
-        } else {
-            const startPx = interaction.startPx;
-            const leftPx = Math.min(startPx, pointerX);
-            const rightPx = Math.max(startPx, pointerX);
-            const leftPercent = (leftPx / rect.width) * 100;
-            const widthPercent = ((rightPx - leftPx) / rect.width) * 100;
-
-            setSelectionBox({
-                leftPercent: clamp(leftPercent, 0, 100),
-                widthPercent: clamp(widthPercent, 0, 100),
-            });
-        }
-    };
-
-    const finalizeInteraction = (event) => {
-        const interaction = interactionRef.current;
-        if (!interaction || interaction.pointerId !== event.pointerId) return;
-
-        const axisElement = axisRef.current;
-        if (!axisElement) {
-            interactionRef.current = null;
-            setSelectionBox(null);
-            return;
-        }
-
-        const rect = axisElement.getBoundingClientRect();
-        const pointerX = clamp(event.clientX - rect.left, 0, rect.width);
-
-        if (interaction.type === 'select') {
-            const startPx = interaction.startPx;
-            const leftPx = Math.min(startPx, pointerX);
-            const rightPx = Math.max(startPx, pointerX);
-
-            if (Math.abs(rightPx - leftPx) > 6) {
-                const baseStart = interaction.viewRangeAtStart.start;
-                const baseEnd = interaction.viewRangeAtStart.end;
-                const baseSpan = baseEnd - baseStart;
-
-                const newStart = baseStart + (leftPx / rect.width) * baseSpan;
-                const newEnd = baseStart + (rightPx / rect.width) * baseSpan;
-                setViewRange(enforceRange(newStart, newEnd));
-            }
-        }
-
-        interactionRef.current = null;
-        setSelectionBox(null);
-        try {
-            surfaceRef.current?.releasePointerCapture(event.pointerId);
-        } catch {
-            // ignore
-        }
-    };
-
-    const handleResetView = () => {
+    const resetView = useCallback(() => {
         setViewRange({ start: bounds.minTime, end: bounds.maxTime });
-    };
+    }, [bounds.maxTime, bounds.minTime]);
 
     const handleResetFilters = () => {
         setFilterText('');
@@ -512,7 +373,7 @@ const TimelinePage = () => {
                                     color="gray"
                                     radius="lg"
                                     size="sm"
-                                    onClick={handleResetView}
+                                    onClick={resetView}
                                     disabled={!isZoomed}
                                 >
                                     전체 범위 보기
@@ -523,28 +384,20 @@ const TimelinePage = () => {
                             좌측 필터에서 스트리머를 선택하거나 검색할 수 있습니다. 시간축(회색 영역)을 드래그하면 확대, 타임라인 영역을 드래그하면 이동하며 Shift+드래그도 확대 기능으로 동작합니다. 더블클릭 시 전체 범위로 복귀합니다.
                         </Text>
 
-                        <div
-                            ref={surfaceRef}
-                            className="relative"
-                            onPointerDown={handlePointerDown}
-                            onPointerMove={handlePointerMove}
-                            onPointerUp={finalizeInteraction}
-                            onPointerCancel={finalizeInteraction}
-                            onDoubleClick={handleResetView}
-                        >
-                            <TimelineTracks
-                                axisRef={axisRef}
-                                axisTicks={axisTicks}
-                                channelRows={channelRows}
-                                selectionBox={selectionBox}
-                                viewRange={viewRange}
-                                viewSpan={viewSpan}
-                                rowHeight={ROW_HEIGHT}
-                                formatDateRange={formatDateRange}
-                                formatDuration={formatDuration}
-                                clamp={clamp}
-                            />
-                        </div>
+                        <TimelineTracks
+                            axisTicks={axisTicks}
+                            channelRows={channelRows}
+                            viewRange={viewRange}
+                            viewSpan={viewSpan}
+                            rowHeight={ROW_HEIGHT}
+                            formatDateRange={formatDateRange}
+                            formatDuration={formatDuration}
+                            clamp={clamp}
+                            bounds={bounds}
+                            minViewSpan={MIN_VIEW_SPAN}
+                            onViewRangeChange={setViewRange}
+                            onResetView={resetView}
+                        />
 
                         {canLoadMore ? (
                             <Button

@@ -1,3 +1,4 @@
+import { useCallback, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Avatar, Badge, Group, Text } from '@mantine/core';
 
@@ -10,17 +11,188 @@ const getInitials = (name = '') => {
 };
 
 export function TimelineTracks({
-    axisRef,
     axisTicks,
     channelRows,
-    selectionBox,
     viewRange,
     viewSpan,
     rowHeight,
     formatDateRange,
     formatDuration,
     clamp,
+    bounds,
+    minViewSpan,
+    onViewRangeChange,
+    onResetView,
 }) {
+    const axisRef = useRef(null);
+    const surfaceRef = useRef(null);
+    const interactionRef = useRef(null);
+    const [selectionBox, setSelectionBox] = useState(null);
+
+    const { minTime, maxTime, span: boundsSpan } = bounds;
+
+    const enforceRange = useCallback(
+        (start, end) => {
+            let nextStart = start;
+            let nextEnd = end;
+            let span = nextEnd - nextStart;
+
+            if (!Number.isFinite(span) || span <= 0) {
+                span = Math.max(minViewSpan, 0);
+                nextStart = minTime;
+                nextEnd = minTime + span;
+            }
+
+            if (span < minViewSpan) {
+                const center = nextStart + span / 2;
+                span = minViewSpan;
+                nextStart = center - span / 2;
+                nextEnd = center + span / 2;
+            }
+
+            if (span > boundsSpan) {
+                return { start: minTime, end: maxTime };
+            }
+
+            if (nextStart < minTime) {
+                nextStart = minTime;
+                nextEnd = nextStart + span;
+            }
+            if (nextEnd > maxTime) {
+                nextEnd = maxTime;
+                nextStart = nextEnd - span;
+            }
+
+            return { start: nextStart, end: nextEnd };
+        },
+        [boundsSpan, maxTime, minTime, minViewSpan]
+    );
+
+    const handlePointerDown = useCallback(
+        (event) => {
+            if (event.button !== 0) return;
+            const axisElement = axisRef.current;
+            const surfaceElement = surfaceRef.current;
+            if (!axisElement || !surfaceElement) return;
+
+            const rect = axisElement.getBoundingClientRect();
+            if (rect.width <= 0 || event.clientX < rect.left || event.clientX > rect.right) return;
+
+            event.preventDefault();
+            const pointerX = clamp(event.clientX - rect.left, 0, rect.width);
+            const isAxisArea = axisElement.contains(event.target);
+            const interactionType = event.shiftKey || isAxisArea ? 'select' : 'pan';
+
+            interactionRef.current = {
+                type: interactionType,
+                pointerId: event.pointerId,
+                startPx: pointerX,
+                viewRangeAtStart: { ...viewRange },
+            };
+
+            if (interactionType === 'select') {
+                setSelectionBox({
+                    leftPercent: (pointerX / rect.width) * 100,
+                    widthPercent: 0,
+                });
+            }
+
+            surfaceElement.setPointerCapture?.(event.pointerId);
+        },
+        [clamp, viewRange]
+    );
+
+    const handlePointerMove = useCallback(
+        (event) => {
+            const interaction = interactionRef.current;
+            if (!interaction || interaction.pointerId !== event.pointerId) return;
+
+            const axisElement = axisRef.current;
+            if (!axisElement) return;
+
+            const rect = axisElement.getBoundingClientRect();
+            if (rect.width <= 0) return;
+
+            const pointerX = clamp(event.clientX - rect.left, 0, rect.width);
+
+            if (interaction.type === 'pan') {
+                const span = interaction.viewRangeAtStart.end - interaction.viewRangeAtStart.start;
+                if (span <= 0) return;
+
+                const deltaPx = pointerX - interaction.startPx;
+                const deltaTime = (deltaPx / rect.width) * span;
+
+                const nextStart = interaction.viewRangeAtStart.start - deltaTime;
+                const nextEnd = interaction.viewRangeAtStart.end - deltaTime;
+
+                onViewRangeChange(enforceRange(nextStart, nextEnd));
+            } else {
+                const startPx = interaction.startPx;
+                const leftPx = Math.min(startPx, pointerX);
+                const rightPx = Math.max(startPx, pointerX);
+                const leftPercent = (leftPx / rect.width) * 100;
+                const widthPercent = ((rightPx - leftPx) / rect.width) * 100;
+
+                setSelectionBox({
+                    leftPercent: clamp(leftPercent, 0, 100),
+                    widthPercent: clamp(widthPercent, 0, 100),
+                });
+            }
+        },
+        [clamp, enforceRange, onViewRangeChange]
+    );
+
+    const finalizeInteraction = useCallback(
+        (event) => {
+            const interaction = interactionRef.current;
+            if (!interaction || interaction.pointerId !== event.pointerId) return;
+
+            const axisElement = axisRef.current;
+            const surfaceElement = surfaceRef.current;
+            if (!axisElement || !surfaceElement) {
+                interactionRef.current = null;
+                setSelectionBox(null);
+                return;
+            }
+
+            const rect = axisElement.getBoundingClientRect();
+            if (rect.width > 0) {
+                const pointerX = clamp(event.clientX - rect.left, 0, rect.width);
+
+                if (interaction.type === 'select') {
+                    const startPx = interaction.startPx;
+                    const leftPx = Math.min(startPx, pointerX);
+                    const rightPx = Math.max(startPx, pointerX);
+
+                    if (Math.abs(rightPx - leftPx) > 6) {
+                        const baseStart = interaction.viewRangeAtStart.start;
+                        const baseEnd = interaction.viewRangeAtStart.end;
+                        const baseSpan = baseEnd - baseStart;
+
+                        const newStart = baseStart + (leftPx / rect.width) * baseSpan;
+                        const newEnd = baseStart + (rightPx / rect.width) * baseSpan;
+                        onViewRangeChange(enforceRange(newStart, newEnd));
+                    }
+                }
+            }
+
+            interactionRef.current = null;
+            setSelectionBox(null);
+            try {
+                surfaceElement.releasePointerCapture?.(event.pointerId);
+            } catch {
+                // ignore
+            }
+        },
+        [clamp, enforceRange, onViewRangeChange]
+    );
+
+    const handleResetView = useCallback(() => {
+        interactionRef.current = null;
+        setSelectionBox(null);
+        onResetView();
+    }, [onResetView]);
+
     if (channelRows.length === 0) {
         return (
             <div className="flex h-40 items-center justify-center rounded-2xl border border-slate-800/60 bg-slate-900/60">
@@ -32,7 +204,15 @@ export function TimelineTracks({
     }
 
     return (
-        <>
+        <div
+            ref={surfaceRef}
+            className="relative"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={finalizeInteraction}
+            onPointerCancel={finalizeInteraction}
+            onDoubleClick={handleResetView}
+        >
             <div className="sticky top-20 z-20 bg-slate-950/90 pb-3 pt-4 backdrop-blur">
                 <div className="grid grid-cols-[220px_minmax(0,1fr)] items-end gap-4 text-xs text-slate-400">
                     <Text size="xs" fw={600} c="dimmed" className="uppercase tracking-wide">
@@ -181,27 +361,31 @@ export function TimelineTracks({
                     )}
                 </div>
             </div>
-        </>
+        </div>
     );
 }
 
 TimelineTracks.propTypes = {
-    axisRef: PropTypes.shape({ current: PropTypes.any }).isRequired,
-    axisTicks: PropTypes.arrayOf(PropTypes.object).isRequired,
-    channelRows: PropTypes.arrayOf(PropTypes.shape({ channel: PropTypes.object, visibleReplays: PropTypes.array })).isRequired,
-    selectionBox: PropTypes.shape({
-        leftPercent: PropTypes.number,
-        widthPercent: PropTypes.number,
-    }),
+    axisTicks: PropTypes.arrayOf(PropTypes.shape({ date: PropTypes.instanceOf(Date), label: PropTypes.string })).isRequired,
+    channelRows: PropTypes.arrayOf(
+        PropTypes.shape({
+            channel: PropTypes.object,
+            visibleReplays: PropTypes.arrayOf(PropTypes.object),
+        })
+    ).isRequired,
     viewRange: PropTypes.shape({ start: PropTypes.number, end: PropTypes.number }).isRequired,
     viewSpan: PropTypes.number.isRequired,
     rowHeight: PropTypes.number.isRequired,
     formatDateRange: PropTypes.func.isRequired,
     formatDuration: PropTypes.func.isRequired,
     clamp: PropTypes.func.isRequired,
-};
-
-TimelineTracks.defaultProps = {
-    selectionBox: null,
+    bounds: PropTypes.shape({
+        minTime: PropTypes.number,
+        maxTime: PropTypes.number,
+        span: PropTypes.number,
+    }).isRequired,
+    minViewSpan: PropTypes.number.isRequired,
+    onViewRangeChange: PropTypes.func.isRequired,
+    onResetView: PropTypes.func.isRequired,
 };
 
