@@ -302,13 +302,19 @@ const TimelinePage = () => {
 
         async function load() {
             try {
-                const res = await fetch('/channel_with_replays.json');
-                if (!res.ok) {
-                    throw new Error(`타임라인 데이터를 불러오지 못했습니다. 상태 코드: ${res.status}`);
-                }
-                const json = await res.json();
+                const files = ['/channel_with_replays_0.json', '/channel_with_replays_1.json'];
+                const responses = await Promise.all(
+                    files.map(async (file) => {
+                        const res = await fetch(file);
+                        if (!res.ok) {
+                            throw new Error(`타임라인 데이터를 불러오지 못했습니다. 상태 코드: ${res.status} (${file})`);
+                        }
+                        return res.json();
+                    })
+                );
+                const merged = responses.flat();
                 if (!aborted) {
-                    setRawTimeline(Array.isArray(json) ? json : []);
+                    setRawTimeline(Array.isArray(merged) ? merged : []);
                     setLoadError(null);
                 }
             } catch (error) {

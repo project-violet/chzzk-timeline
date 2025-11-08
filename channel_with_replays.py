@@ -150,11 +150,21 @@ def main() -> None:
             }
         )
 
-    if summary_entries:
-        data_dir.mkdir(parents=True, exist_ok=True)
-        save_summary_json(summary_entries, summary_path)
-    else:
+    if not summary_entries:
         print("⚠️  저장할 요약 정보가 없습니다.")
+        return
+
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    split_index = len(summary_entries) // 10
+    chunks = [
+        summary_entries[:split_index],
+        summary_entries[split_index:],
+    ]
+
+    for idx, chunk in enumerate(chunks):
+        output_path = summary_path.with_name(f"channel_with_replays_{idx}.json")
+        save_summary_json(chunk, output_path)
 
 
 if __name__ == "__main__":
