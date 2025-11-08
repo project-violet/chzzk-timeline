@@ -66,7 +66,7 @@ const ReplaySummaryCard = ({
                                 <Badge
                                     key={label}
                                     variant="light"
-                                    color={selectedCategories.includes(label) ? 'teal' : 'gray'}
+                                    color={'teal'}
                                     radius="lg"
                                     size="md"
                                     className="cursor-pointer transition-colors hover:bg-teal-400/20"
@@ -89,7 +89,7 @@ const ReplaySummaryCard = ({
                                 <Badge
                                     key={label}
                                     variant="light"
-                                    color={selectedTags.includes(label) ? 'teal' : 'gray'}
+                                    color={'gray'}
                                     radius="lg"
                                     size="md"
                                     className="cursor-pointer transition-colors hover:bg-teal-400/20"
