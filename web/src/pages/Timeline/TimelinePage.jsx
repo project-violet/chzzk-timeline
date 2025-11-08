@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Container, Group, MultiSelect, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Badge, Button, Container, Group, MultiSelect, Stack, Text, TextInput, Title } from '@mantine/core';
 import { StreamerFilter } from './StreamerFilter.jsx';
 import { TimelineTracks } from './TimelineTracks.jsx';
 
@@ -10,6 +10,81 @@ const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 const ROW_HEIGHT = 84;
 const THREE_MONTHS_MS = 90 * DAY_MS;
+const TOP_CATEGORY_LIMIT = 24;
+const TOP_TAG_LIMIT = 48;
+
+const ReplaySummaryCard = ({
+    summary,
+    onCategoryToggle,
+    onTagToggle,
+}) => (
+    <div className="rounded-2xl border border-slate-800/60 bg-slate-900/60 p-5">
+        {summary.total > 0 ? (
+            <Stack gap="md">
+                <div>
+                    <Text size="sm" fw={700}>
+                        총 리플레이 {summary.total.toLocaleString('ko-KR')}개
+                    </Text>
+                    <Text size="xs" c="dimmed" mt={4}>
+                        필터 조건에 부합하는 전체 리플레이 수집 결과입니다. (더 보기 데이터 포함)
+                    </Text>
+                </div>
+
+                {summary.categories.length > 0 ? (
+                    <div>
+                        <Text size="xs" fw={600} c="dimmed">
+                            카테고리 TOP {summary.categories.length}
+                        </Text>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            {summary.categories.map(({ label, count }) => (
+                                <Badge
+                                    key={label}
+                                    variant="light"
+                                    color={'teal'}
+                                    radius="lg"
+                                    size="md"
+                                    className="cursor-pointer transition-colors hover:bg-teal-400/20"
+                                    onClick={() => onCategoryToggle(label)}
+                                >
+                                    {label} · {count.toLocaleString('ko-KR')}
+                                </Badge>
+                            ))}
+                        </div>
+                    </div>
+                ) : null}
+
+                {summary.tags.length > 0 ? (
+                    <div>
+                        <Text size="xs" fw={600} c="dimmed">
+                            태그 TOP {summary.tags.length}
+                        </Text>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            {summary.tags.map(({ label, count }) => (
+                                <Badge
+                                    key={label}
+                                    variant="light"
+                                    color={'gray'}
+                                    radius="lg"
+                                    size="md"
+                                    className="cursor-pointer transition-colors hover:bg-teal-400/20"
+                                    onClick={() => onTagToggle(label)}
+                                >
+                                    #{label} · {count.toLocaleString('ko-KR')}
+                                </Badge>
+                            ))}
+                        </div>
+                    </div>
+                ) : null}
+            </Stack>
+        ) : (
+            <div className="py-4 text-center">
+                <Text size="sm" c="dimmed">
+                    현재 선택한 범위와 필터에 해당하는 리플레이가 없습니다.
+                </Text>
+            </div>
+        )}
+    </div>
+);
 
 const parseDate = (value) => {
     if (!value) return null;
@@ -447,6 +522,54 @@ const TimelinePage = () => {
         [visibleChannels, viewRange.start, viewRange.end]
     );
 
+    const replaySummary = useMemo(() => {
+        const categoryCounter = new Map();
+        const tagCounter = new Map();
+        let total = 0;
+
+        replayFilteredTimeline.forEach((channel) => {
+            channel.replays.forEach((replay) => {
+                total += 1;
+
+                const category = (replay?.categoryKo ?? '').trim();
+                if (category) {
+                    categoryCounter.set(category, (categoryCounter.get(category) ?? 0) + 1);
+                }
+
+                if (Array.isArray(replay?.tags)) {
+                    replay.tags
+                        .map((tag) => (typeof tag === 'string' ? tag.trim() : ''))
+                        .filter(Boolean)
+                        .forEach((tag) => {
+                            tagCounter.set(tag, (tagCounter.get(tag) ?? 0) + 1);
+                        });
+                }
+            });
+        });
+
+        const categories = Array.from(categoryCounter.entries())
+            .sort((a, b) => {
+                if (b[1] !== a[1]) return b[1] - a[1];
+                return a[0].localeCompare(b[0], 'ko-KR');
+            })
+            .slice(0, TOP_CATEGORY_LIMIT)
+            .map(([label, count]) => ({ label, count }));
+
+        const tags = Array.from(tagCounter.entries())
+            .sort((a, b) => {
+                if (b[1] !== a[1]) return b[1] - a[1];
+                return a[0].localeCompare(b[0], 'ko-KR');
+            })
+            .slice(0, TOP_TAG_LIMIT)
+            .map(([label, count]) => ({ label, count }));
+
+        return {
+            total,
+            categories,
+            tags,
+        };
+    }, [replayFilteredTimeline]);
+
     const canLoadMore = visibleCount < replayFilteredTimeline.length;
     const isFilterActive =
         filterText.trim().length > 0 ||
@@ -597,6 +720,20 @@ const TimelinePage = () => {
                             minViewSpan={MIN_VIEW_SPAN}
                             onViewRangeChange={setViewRange}
                             onResetView={resetView}
+                        />
+
+                        <ReplaySummaryCard
+                            summary={replaySummary}
+                            onCategoryToggle={(label) => {
+                                setSelectedCategories((prev) =>
+                                    prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
+                                );
+                            }}
+                            onTagToggle={(label) => {
+                                setSelectedTags((prev) =>
+                                    prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
+                                );
+                            }}
                         />
 
                         {canLoadMore ? (
