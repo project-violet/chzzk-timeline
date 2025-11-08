@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavLink, Routes, Route, Navigate } from 'react-router-dom';
 import MapPage from './pages/Map/MapPage.jsx';
 import TimelinePage from './pages/Timeline/TimelinePage.jsx';
@@ -21,6 +22,8 @@ const externalLinks = [
 ];
 
 const App = () => {
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
+
   return (
     <div className="min-h-screen text-white">
       <nav className="fixed left-1/2 top-6 z-50 flex -translate-x-1/2 items-center gap-6 rounded-full bg-slate-900/80 px-8 py-3 text-sm font-semibold shadow-lg backdrop-blur">
@@ -61,8 +64,55 @@ const App = () => {
               />
             </a>
           ))}
+          <button
+            type="button"
+            onClick={() => setIsInfoOpen(true)}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-800/70 text-slate-100 transition-colors hover:bg-slate-700/80"
+            aria-label="프로젝트 정보 보기"
+            title="프로젝트 정보"
+          >
+            ?
+          </button>
         </div>
       </nav>
+
+      {isInfoOpen ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-6"
+          onClick={() => setIsInfoOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-lg rounded-3xl border border-slate-700/70 bg-slate-900/95 p-8 text-slate-100 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setIsInfoOpen(false)}
+              className="absolute right-4 top-4 rounded-full px-3 py-1 text-sm font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
+              aria-label="정보 창 닫기"
+            >
+              닫기
+            </button>
+            <h2 className="text-2xl font-bold text-teal-300">치지직 타임라인</h2>
+            <a
+              href="https://github.com/project-violet/chzzk-timeline"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-block text-sm text-slate-300 underline decoration-teal-400/70 decoration-dashed underline-offset-4 transition-colors hover:text-white"
+            >
+              https://github.com/project-violet/chzzk-timeline
+            </a>
+            <div className="mt-6 space-y-2 text-sm text-slate-200">
+              <p>치지직 다시보기 정보를 스트리머 별로 타임라인으로 보여줍니다.</p>
+              <p>모든 정보는 누구나 접근 가능한 치지직 공개 API를 통해 얻고 있습니다.</p>
+              <p>이 프로젝트는 오픈소스이며 누구나 자유롭게 사용할 수 있습니다.</p>
+              <p>문의: violet.dev.master@gmail.com</p>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="relative min-h-screen">
         <Routes>
