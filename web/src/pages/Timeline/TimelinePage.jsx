@@ -633,34 +633,11 @@ const TimelinePage = () => {
     }, [replayFilteredTimeline]);
 
     const canLoadMore = visibleCount < replayFilteredTimeline.length;
-    const isDefaultDateRange =
-        startDateFilter === defaultDateRangeRef.current.start &&
-        endDateFilter === defaultDateRangeRef.current.end;
-    const isFilterActive =
-        filterText.trim().length > 0 ||
-        selectedChannelIds.length > 0 ||
-        replayTitleFilter.trim().length > 0 ||
-        selectedCategories.length > 0 ||
-        selectedTags.length > 0 ||
-        !isDefaultDateRange;
     const selectedCount = selectedChannelIds.length;
 
     const resetView = useCallback(() => {
         setViewRange({ start: bounds.minTime, end: bounds.maxTime });
     }, [bounds.maxTime, bounds.minTime]);
-
-    const handleResetFilters = () => {
-        setFilterText('');
-        setSelectedChannelIds([]);
-        setReplayTitleFilter('');
-        setSelectedCategories([]);
-        setSelectedTags([]);
-        const defaults = createDefaultDateRange();
-        defaultDateRangeRef.current = defaults;
-        setStartDateFilter(defaults.start);
-        setEndDateFilter(defaults.end);
-        setActivePreset(90);
-    };
 
     const toggleChannelSelection = (id) => {
         setSelectedChannelIds((prev) => {
@@ -670,10 +647,6 @@ const TimelinePage = () => {
             return [...prev, id];
         });
     };
-
-    const isZoomed =
-        Math.round(viewRange.start) !== Math.round(bounds.minTime) ||
-        Math.round(viewRange.end) !== Math.round(bounds.maxTime);
 
     return (
         <div className="min-h-screen bg-slate-950/95 pb-20 pt-28 text-slate-100">
@@ -685,8 +658,7 @@ const TimelinePage = () => {
                         sidebarChannels={sidebarChannels}
                         selectedChannelIds={selectedChannelIds}
                         onToggleChannel={toggleChannelSelection}
-                        onResetFilters={handleResetFilters}
-                        isFilterActive={isFilterActive}
+                        onResetSelection={() => setSelectedChannelIds([])}
                         selectedCount={selectedCount}
                     />
                     <Stack gap="xl">
@@ -778,7 +750,9 @@ const TimelinePage = () => {
                                         <input
                                             type="date"
                                             value={startDateFilter}
-                                            onChange={(event) => setStartDateFilter(event.currentTarget.value)}
+                                            onChange={(event) => {
+                                                setStartDateFilter(event.currentTarget.value);
+                                            }}
                                             className="mt-1 rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 focus:border-teal-400 focus:outline-none"
                                         />
                                     </label>
@@ -788,7 +762,9 @@ const TimelinePage = () => {
                                         <input
                                             type="date"
                                             value={endDateFilter}
-                                            onChange={(event) => setEndDateFilter(event.currentTarget.value)}
+                                            onChange={(event) => {
+                                                setEndDateFilter(event.currentTarget.value);
+                                            }}
                                             className="mt-1 rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 focus:border-teal-400 focus:outline-none"
                                         />
                                     </label>

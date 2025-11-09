@@ -32,8 +32,7 @@ export function StreamerFilter({
     sidebarChannels,
     selectedChannelIds,
     onToggleChannel,
-    onResetFilters,
-    isFilterActive,
+    onResetSelection,
     selectedCount,
 }) {
     const containerRef = useRef(null);
@@ -118,18 +117,16 @@ export function StreamerFilter({
                 <Badge size="sm" radius="lg" variant="light" color={selectedCount ? 'teal' : 'gray'}>
                     선택 {selectedCount.toLocaleString('ko-KR')}명
                 </Badge>
-                <Group gap="xs">
-                    <Button
-                        variant="subtle"
-                        color="gray"
-                        size="xs"
-                        radius="lg"
-                        onClick={onResetFilters}
-                        disabled={!isFilterActive}
-                    >
-                        필터 초기화
-                    </Button>
-                </Group>
+                <Button
+                    variant="subtle"
+                    color="gray"
+                    size="xs"
+                    radius="lg"
+                    onClick={() => onResetSelection?.()}
+                    disabled={selectedChannelIds.length === 0}
+                >
+                    선택 초기화
+                </Button>
             </Group>
 
             <ScrollArea style={{ flex: 1 }} type="auto" offsetScrollbars viewportRef={viewportRef}>
