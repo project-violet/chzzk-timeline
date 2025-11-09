@@ -1,0 +1,45 @@
+name: Data Sync
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  sync-job:
+    runs-on: ubuntu-22.04
+    steps:
+      #
+      #   Setup
+      #
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-python@v2
+        with:
+          python-version: "3.13"
+
+      #
+      #   Extract
+      #
+      - name: Extract
+        run: |
+          python3 extract_channel_replays.py
+          python3 channel_with_replays.py
+
+      - name: Revision
+        run: |
+          git config --local user.email "violet.dev.master.bot@gmail.com"
+          git config --local user.name "violet-dev-bot"
+          git config --global pull.rebase false
+          git add web/public/
+          git commit -m "Data Sync"
+          git pull
+
+      - name: Push
+        id: trypush
+        uses: ad-m/github-push-action@master
+        with:
+          branch: "main"
+          github_token: $
