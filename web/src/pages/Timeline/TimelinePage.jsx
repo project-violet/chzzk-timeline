@@ -112,6 +112,172 @@ const ReplaySummaryCard = ({
     </div>
 );
 
+const TimelinePageHeader = ({ loadError, totalCount }) => (
+    <Group justify="space-between" align="flex-end">
+        <div>
+            <Title order={1} size={36} fw={800}>
+                치지직 타임라인
+            </Title>
+            {loadError && (
+                <Text c="red.4" size="sm" mt={6}>
+                    타임라인 데이터를 불러오지 못했습니다. 새로고침하거나 나중에 다시 시도해주세요.
+                </Text>
+            )}
+            <Text size="md" c="dimmed" mt={6}>
+                팔로워 수 순으로 정렬된 스트리머 방송 시간을 하나의 축에서 비교해 보세요.
+            </Text>
+            <Text size="xs" c="dimmed" mt={6}>
+                현재 {totalCount.toLocaleString('ko-KR')}명의 스트리머가 조건에 맞습니다.
+            </Text>
+        </div>
+    </Group>
+);
+
+const TimelineFilterControls = ({
+    replayTitleFilter,
+    onReplayTitleFilterChange,
+    onReplayTitleFilterClear,
+    replayKeywords,
+    categoryOptions,
+    selectedCategories,
+    onSelectedCategoriesChange,
+    tagOptions,
+    selectedTags,
+    onSelectedTagsChange,
+    startDateFilter,
+    onStartDateFilterChange,
+    endDateFilter,
+    onEndDateFilterChange,
+    activePreset,
+    onPresetRangeSelect,
+}) => (
+    <Group align="flex-start" justify="space-between" gap="xl" wrap="wrap">
+        <Stack gap="xs" className="w-full max-w-5xl">
+            <Group align="flex-end" gap="sm" wrap="wrap" className="w-full">
+                <div className="flex w-full flex-1 min-w-[240px]">
+                    <TextInput
+                        label="방제 키워드 필터"
+                        placeholder="쉼표(,)로 구분된 키워드를 모두 포함하는 리플레이만 표시"
+                        value={replayTitleFilter}
+                        onChange={onReplayTitleFilterChange}
+                        radius="lg"
+                        size="sm"
+                        className="w-full max-w-xl"
+                    />
+                </div>
+                <div className="flex w-full flex-1 min-w-[240px]">
+                    <Button
+                        variant="subtle"
+                        color="gray"
+                        radius="lg"
+                        size="xs"
+                        onClick={onReplayTitleFilterClear}
+                        disabled={replayKeywords.length === 0}
+                    >
+                        키워드 초기화
+                    </Button>
+                </div>
+            </Group>
+            <Group gap="sm" align="end" className="w-full">
+                <div className="flex w-full flex-1 min-w-[240px]">
+                    <MultiSelect
+                        data={categoryOptions}
+                        value={selectedCategories}
+                        onChange={onSelectedCategoriesChange}
+                        label="카테고리 필터"
+                        placeholder="카테고리를 선택하세요"
+                        searchable
+                        clearable
+                        radius="lg"
+                        size="sm"
+                        className="w-full max-w-xl"
+                        nothingFoundMessage="일치하는 카테고리가 없습니다."
+                        maxDropdownHeight={280}
+                    />
+                </div>
+                <div className="flex w-full flex-1 min-w-[240px]">
+                    <MultiSelect
+                        data={tagOptions}
+                        value={selectedTags}
+                        onChange={onSelectedTagsChange}
+                        label="태그 필터"
+                        placeholder="태그를 선택하세요"
+                        searchable
+                        clearable
+                        radius="lg"
+                        size="sm"
+                        className="w-full max-w-xl"
+                        nothingFoundMessage="일치하는 태그가 없습니다."
+                        maxDropdownHeight={280}
+                    />
+                </div>
+            </Group>
+        </Stack>
+
+        <Stack gap="xs" className="w-full max-w-sm">
+            <div className="flex items-end gap-3">
+                <label className="flex flex-1 flex-col text-xs font-semibold text-slate-300">
+                    <span>시작일</span>
+                    <input
+                        type="date"
+                        value={startDateFilter}
+                        onChange={onStartDateFilterChange}
+                        className="mt-1 rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 focus:border-teal-400 focus:outline-none"
+                    />
+                </label>
+                <span className="pb-2 text-sm text-slate-400">~</span>
+                <label className="flex flex-1 flex-col text-xs font-semibold text-slate-300">
+                    <span>종료일</span>
+                    <input
+                        type="date"
+                        value={endDateFilter}
+                        onChange={onEndDateFilterChange}
+                        className="mt-1 rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 focus:border-teal-400 focus:outline-none"
+                    />
+                </label>
+            </div>
+            <Group gap="xs" wrap="nowrap">
+                <Button
+                    variant="subtle"
+                    color={activePreset === 90 ? 'teal' : 'gray'}
+                    radius="lg"
+                    size="xs"
+                    onClick={() => onPresetRangeSelect(90)}
+                >
+                    최근 3개월
+                </Button>
+                <Button
+                    variant="subtle"
+                    color={activePreset === 180 ? 'teal' : 'gray'}
+                    radius="lg"
+                    size="xs"
+                    onClick={() => onPresetRangeSelect(180)}
+                >
+                    최근 6개월
+                </Button>
+                <Button
+                    variant="subtle"
+                    color={activePreset === 365 ? 'teal' : 'gray'}
+                    radius="lg"
+                    size="xs"
+                    onClick={() => onPresetRangeSelect(365)}
+                >
+                    최근 1년
+                </Button>
+                <Button
+                    variant="subtle"
+                    color={activePreset === 'all' ? 'teal' : 'gray'}
+                    radius="lg"
+                    size="xs"
+                    onClick={() => onPresetRangeSelect(Infinity)}
+                >
+                    전체 기간
+                </Button>
+            </Group>
+        </Stack>
+    </Group>
+);
+
 const parseDate = (value) => {
     if (!value) return null;
     const safe = value.replace(' ', 'T');
@@ -646,153 +812,32 @@ const TimelinePage = () => {
                         selectedCount={selectedCount}
                     />
                     <Stack gap="xl">
-                        <Group justify="space-between" align="flex-end">
-                            <div>
-                                <Title order={1} size={36} fw={800}>
-                                    치지직 타임라인
-                                </Title>
-                                {loadError && (
-                                    <Text c="red.4" size="sm" mt={6}>
-                                        타임라인 데이터를 불러오지 못했습니다. 새로고침하거나 나중에 다시 시도해주세요.
-                                    </Text>
-                                )}
-                                <Text size="md" c="dimmed" mt={6}>
-                                    팔로워 수 순으로 정렬된 스트리머 방송 시간을 하나의 축에서 비교해 보세요.
-                                </Text>
-                                <Text size="xs" c="dimmed" mt={6}>
-                                    현재 {replayFilteredTimeline.length.toLocaleString('ko-KR')}명의 스트리머가 조건에 맞습니다.
-                                </Text>
-                            </div>
-                        </Group>
-                        <Group align="flex-start" justify="space-between" gap="xl" wrap="wrap">
-                            <Stack gap="xs" className="w-full max-w-5xl">
-                                <Group align="flex-end" gap="sm" wrap="wrap" className="w-full">
-                                    <div className="flex w-full flex-1 min-w-[240px]">
-                                        <TextInput
-                                            label="방제 키워드 필터"
-                                            placeholder="쉼표(,)로 구분된 키워드를 모두 포함하는 리플레이만 표시"
-                                            value={replayTitleFilter}
-                                            onChange={(event) => setReplayTitleFilter(event.currentTarget.value)}
-                                            radius="lg"
-                                            size="sm"
-                                            className="w-full max-w-xl"
-                                        />
-                                    </div>
-                                    <div className="flex w-full flex-1 min-w-[240px]">
-                                        <Button
-                                            variant="subtle"
-                                            color="gray"
-                                            radius="lg"
-                                            size="xs"
-                                            onClick={() => setReplayTitleFilter('')}
-                                            disabled={replayKeywords.length === 0}
-                                        >
-                                            키워드 초기화
-                                        </Button>
-                                    </div>
-                                </Group>
-                                <Group gap="sm" align="end" className="w-full">
-                                    <div className="flex w-full flex-1 min-w-[240px]">
-                                        <MultiSelect
-                                            data={categoryOptions}
-                                            value={selectedCategories}
-                                            onChange={setSelectedCategories}
-                                            label="카테고리 필터"
-                                            placeholder="카테고리를 선택하세요"
-                                            searchable
-                                            clearable
-                                            radius="lg"
-                                            size="sm"
-                                            className="w-full max-w-xl"
-                                            nothingFoundMessage="일치하는 카테고리가 없습니다."
-                                            maxDropdownHeight={280}
-                                        />
-                                    </div>
-                                    <div className="flex w-full flex-1 min-w-[240px]">
-                                        <MultiSelect
-                                            data={tagOptions}
-                                            value={selectedTags}
-                                            onChange={setSelectedTags}
-                                            label="태그 필터"
-                                            placeholder="태그를 선택하세요"
-                                            searchable
-                                            clearable
-                                            radius="lg"
-                                            size="sm"
-                                            className="w-full max-w-xl"
-                                            nothingFoundMessage="일치하는 태그가 없습니다."
-                                            maxDropdownHeight={280}
-                                        />
-                                    </div>
-                                </Group>
-                            </Stack>
-
-                            <Stack gap="xs" className="w-full max-w-sm">
-                                <div className="flex items-end gap-3">
-                                    <label className="flex flex-1 flex-col text-xs font-semibold text-slate-300">
-                                        <span>시작일</span>
-                                        <input
-                                            type="date"
-                                            value={startDateFilter}
-                                            onChange={(event) => {
-                                                setStartDateFilter(event.currentTarget.value);
-                                            }}
-                                            className="mt-1 rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 focus:border-teal-400 focus:outline-none"
-                                        />
-                                    </label>
-                                    <span className="pb-2 text-sm text-slate-400">~</span>
-                                    <label className="flex flex-1 flex-col text-xs font-semibold text-slate-300">
-                                        <span>종료일</span>
-                                        <input
-                                            type="date"
-                                            value={endDateFilter}
-                                            onChange={(event) => {
-                                                setEndDateFilter(event.currentTarget.value);
-                                            }}
-                                            className="mt-1 rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 focus:border-teal-400 focus:outline-none"
-                                        />
-                                    </label>
-                                </div>
-                                <Group gap="xs" wrap="nowrap">
-                                    <Button
-                                        variant="subtle"
-                                        color={activePreset === 90 ? 'teal' : 'gray'}
-                                        radius="lg"
-                                        size="xs"
-                                        onClick={() => applyPresetRange(90)}
-                                    >
-                                        최근 3개월
-                                    </Button>
-                                    <Button
-                                        variant="subtle"
-                                        color={activePreset === 180 ? 'teal' : 'gray'}
-                                        radius="lg"
-                                        size="xs"
-                                        onClick={() => applyPresetRange(180)}
-                                    >
-                                        최근 6개월
-                                    </Button>
-                                    <Button
-                                        variant="subtle"
-                                        color={activePreset === 365 ? 'teal' : 'gray'}
-                                        radius="lg"
-                                        size="xs"
-                                        onClick={() => applyPresetRange(365)}
-                                    >
-                                        최근 1년
-                                    </Button>
-                                    <Button
-                                        variant="subtle"
-                                        color={activePreset === 'all' ? 'teal' : 'gray'}
-                                        radius="lg"
-                                        size="xs"
-                                        onClick={() => applyPresetRange(Infinity)}
-                                    >
-                                        전체 기간
-                                    </Button>
-                                </Group>
-                            </Stack>
-                        </Group>
+                        <TimelinePageHeader
+                            loadError={loadError}
+                            totalCount={replayFilteredTimeline.length}
+                        />
+                        <TimelineFilterControls
+                            replayTitleFilter={replayTitleFilter}
+                            onReplayTitleFilterChange={(event) => setReplayTitleFilter(event.currentTarget.value)}
+                            onReplayTitleFilterClear={() => setReplayTitleFilter('')}
+                            replayKeywords={replayKeywords}
+                            categoryOptions={categoryOptions}
+                            selectedCategories={selectedCategories}
+                            onSelectedCategoriesChange={setSelectedCategories}
+                            tagOptions={tagOptions}
+                            selectedTags={selectedTags}
+                            onSelectedTagsChange={setSelectedTags}
+                            startDateFilter={startDateFilter}
+                            onStartDateFilterChange={(event) => {
+                                setStartDateFilter(event.currentTarget.value);
+                            }}
+                            endDateFilter={endDateFilter}
+                            onEndDateFilterChange={(event) => {
+                                setEndDateFilter(event.currentTarget.value);
+                            }}
+                            activePreset={activePreset}
+                            onPresetRangeSelect={applyPresetRange}
+                        />
 
                         <Text size="xs" c="dimmed">
                             좌측 필터에서 스트리머를 선택하거나 검색할 수 있습니다. 시간축(회색 영역)을 드래그하면 확대, 타임라인 영역을 드래그하면 이동하며 Shift+드래그도 확대 기능으로 동작합니다. 더블클릭 시 전체 범위로 복귀합니다. 아래 키워드 필터를 사용하면 입력한 모든 키워드를 포함한 방송 제목만 표시됩니다.
