@@ -172,6 +172,7 @@ export function StreamerFilter({
                                         className="flex h-full w-full cursor-pointer select-none items-center rounded-lg px-2 py-2 transition hover:bg-slate-800/50"
                                         onMouseDown={(event) => event.preventDefault()}
                                         onClick={(event) => {
+                                            if (event.target instanceof HTMLInputElement) return;
                                             event.preventDefault();
                                             onToggleChannel(id);
                                         }}
