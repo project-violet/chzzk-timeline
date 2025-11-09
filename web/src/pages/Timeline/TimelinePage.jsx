@@ -295,6 +295,7 @@ const TimelinePage = () => {
     const defaultDateRangeRef = useRef(createDefaultDateRange());
     const [startDateFilter, setStartDateFilter] = useState(defaultDateRangeRef.current.start);
     const [endDateFilter, setEndDateFilter] = useState(defaultDateRangeRef.current.end);
+    const [activePreset, setActivePreset] = useState(90);
 
     useEffect(() => {
         let aborted = false;
@@ -406,6 +407,7 @@ const TimelinePage = () => {
     const applyPresetRange = useCallback(
         (days) => {
             const end = new Date();
+            setActivePreset(days === Infinity ? 'all' : days);
             let start = new Date(end.getTime() - days * DAY_MS);
             setStartDateFilter(toDateInputValue(start));
             setEndDateFilter(toDateInputValue(end));
@@ -657,6 +659,7 @@ const TimelinePage = () => {
         defaultDateRangeRef.current = defaults;
         setStartDateFilter(defaults.start);
         setEndDateFilter(defaults.end);
+        setActivePreset(90);
     };
 
     const toggleChannelSelection = (id) => {
@@ -793,7 +796,7 @@ const TimelinePage = () => {
                                 <Group gap="xs" wrap="nowrap">
                                     <Button
                                         variant="subtle"
-                                        color="teal"
+                                        color={activePreset === 90 ? 'teal' : 'gray'}
                                         radius="lg"
                                         size="xs"
                                         onClick={() => applyPresetRange(90)}
@@ -802,7 +805,7 @@ const TimelinePage = () => {
                                     </Button>
                                     <Button
                                         variant="subtle"
-                                        color="teal"
+                                        color={activePreset === 180 ? 'teal' : 'gray'}
                                         radius="lg"
                                         size="xs"
                                         onClick={() => applyPresetRange(180)}
@@ -811,7 +814,7 @@ const TimelinePage = () => {
                                     </Button>
                                     <Button
                                         variant="subtle"
-                                        color="teal"
+                                        color={activePreset === 365 ? 'teal' : 'gray'}
                                         radius="lg"
                                         size="xs"
                                         onClick={() => applyPresetRange(365)}
@@ -820,7 +823,7 @@ const TimelinePage = () => {
                                     </Button>
                                     <Button
                                         variant="subtle"
-                                        color="gray"
+                                        color={activePreset === 'all' ? 'teal' : 'gray'}
                                         radius="lg"
                                         size="xs"
                                         onClick={() => applyPresetRange(Infinity)}
