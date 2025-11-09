@@ -133,11 +133,9 @@ def main() -> None:
             print(f"⚠️  최신 리플레이 선택 실패: {channel_name}")
             continue
 
-        title = latest.get("title", "제목 없음")
         publish_date = latest.get("publishDate")
         duration_seconds = get_duration_seconds(latest)
         start_str, end_str = format_time_window(publish_date, duration_seconds)
-        print(f"{channel_name}\t{followers}\t{title}\t{start_str} ~ {end_str}")
 
         replay_entries = build_replay_entries(videos)
         summary_entries.append(

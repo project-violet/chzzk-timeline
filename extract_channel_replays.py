@@ -31,13 +31,17 @@ def main() -> None:
             print(f"❌ 채널 ID 없음, 건너뜀: {channel_name!r}")
             continue
 
+        output_path = output_dir / f"{channel_id}_replays.json"
+        if output_path.exists():
+            print(f"⚠️  이미 존재하는 파일: {output_path.name}")
+            continue
+
         try:
             replays = list_replays_all(channel_id, size=50)
         except ChzzkAPIError as err:
             print(f"⚠️  재생목록을 가져오지 못했습니다 ({channel_name}): {err}")
             continue
 
-        output_path = output_dir / f"{channel_id}_replays.json"
         save_json(replays, str(output_path))
         # time.sleep(0.5)
 
