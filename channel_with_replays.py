@@ -88,7 +88,7 @@ def build_replay_entries(videos: Iterable[dict]) -> list[dict]:
 
 def save_summary_json(data: list[dict], path: Path) -> None:
     with path.open("w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False, indent=2)
+        json.dump(data, file, ensure_ascii=False, separators=(",", ":"))
     print(f"✅ 요약 JSON 저장 완료: {path}")
 
 
