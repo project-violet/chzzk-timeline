@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Avatar, Badge, Button, Card, Checkbox, Group, ScrollArea, Stack, Text, TextInput } from '@mantine/core';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { hangulToKeystrokes, levenshteinDistance } from '../../utils/hangul';
@@ -27,6 +27,13 @@ const getInitials = (name = '') => {
 
 const CHANNEL_ROW_HEIGHT = 60;
 
+const CloseIcon = (props) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...props}>
+        <path d="M6 6l12 12" />
+        <path d="M6 18l12-12" />
+    </svg>
+);
+
 export function StreamerFilter({
     channels = [],
     selectedChannelIds,
@@ -40,6 +47,8 @@ export function StreamerFilter({
     const viewportRef = useRef(null);
 
     const [filterText, setFilterText] = useState('');
+    const [isMobilePanelOpen, setIsMobilePanelOpen] = useState(false);
+    const contentId = useId();
 
     const channelMetadata = useMemo(() => {
         return channels.map((channel, index) => {
@@ -100,6 +109,47 @@ export function StreamerFilter({
         };
     }, []);
 
+    useEffect(() => {
+        if (isFixedLayout) {
+            setIsMobilePanelOpen(false);
+        }
+    }, [isFixedLayout]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return undefined;
+
+        const handleOpenRequest = () => {
+            if (isFixedLayout) return;
+            setIsMobilePanelOpen(true);
+        };
+
+        window.addEventListener('open-streamer-filter', handleOpenRequest);
+
+        return () => {
+            window.removeEventListener('open-streamer-filter', handleOpenRequest);
+        };
+    }, [isFixedLayout]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || typeof document === 'undefined') return undefined;
+        if (!isMobilePanelOpen) return undefined;
+
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') {
+                setIsMobilePanelOpen(false);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        const { overflow } = document.body.style;
+        document.body.style.overflow = 'hidden';
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            document.body.style.overflow = overflow;
+        };
+    }, [isMobilePanelOpen]);
+
     useLayoutEffect(() => {
         if (!isFixedLayout || typeof window === 'undefined') return undefined;
 
@@ -127,16 +177,16 @@ export function StreamerFilter({
         };
     }, [isFixedLayout]);
 
-    const cardContent = (
-        <Stack gap="sm" className="h-full">
-            <div>
-                <Text size="sm" fw={700}>
-                    스트리머 필터
-                </Text>
-                <Text size="xs" c="dimmed" mt={4}>
-                    검색하거나 체크해 원하는 스트리머만 타임라인에 표시해 보세요.
-                </Text>
-            </div>
+    const renderFilterBody = ({ includeId = false, className = '' } = {}) => (
+        <Stack
+            gap="sm"
+            id={includeId ? contentId : undefined}
+            className={`flex-1 ${className}`.trim()}
+            style={{ minHeight: 0 }}
+        >
+            <Text size="xs" c="dimmed">
+                검색하거나 체크해 원하는 스트리머만 타임라인에 표시해 보세요.
+            </Text>
 
             <TextInput
                 value={filterText}
@@ -163,7 +213,7 @@ export function StreamerFilter({
                 </Button>
             </Group>
 
-            <ScrollArea style={{ flex: 1 }} type="auto" offsetScrollbars viewportRef={viewportRef}>
+            <ScrollArea style={{ flex: 1, minHeight: 0 }} type="auto" offsetScrollbars viewportRef={viewportRef}>
                 {isEmpty ? (
                     <div
                         className="flex h-32 items-center justify-center rounded-xl border"
@@ -247,6 +297,15 @@ export function StreamerFilter({
         </Stack>
     );
 
+    const desktopCardContent = (
+        <div className="flex h-full flex-col">
+            <Text size="sm" fw={700} className="px-1 py-1 text-slate-100">
+                스트리머 필터
+            </Text>
+            {renderFilterBody({ includeId: true, className: 'mt-3' })}
+        </div>
+    );
+
     if (isFixedLayout) {
         return (
             <aside ref={containerRef} className="relative" style={{ minHeight: '100vh' }}>
@@ -269,37 +328,65 @@ export function StreamerFilter({
                             className="flex h-full flex-col"
                             style={CARD_STYLE}
                         >
-                            {cardContent}
+                            {desktopCardContent}
                         </Card>
                     </div>
-                ) : null}
-                <div className="lg:hidden">
+                ) : (
                     <Card
                         radius="xl"
                         padding="lg"
                         withBorder
                         className="flex flex-col"
-                        style={{ ...CARD_STYLE, marginTop: NAV_OFFSET }}
+                        style={{ ...CARD_STYLE, marginTop: NAV_OFFSET, maxHeight: FILTER_HEIGHT }}
                     >
-                        {cardContent}
+                        {desktopCardContent}
                     </Card>
-                </div>
+                )}
             </aside>
         );
     }
 
     return (
-        <aside className="sticky top-0 self-start" style={{ height: '100vh' }}>
-            <Card
-                radius="xl"
-                padding="lg"
-                withBorder
-                className="flex h-full flex-col"
-                style={{ ...CARD_STYLE, height: FILTER_HEIGHT, marginTop: NAV_OFFSET }}
+        <>
+            <div
+                className={`fixed inset-0 z-[60] transition-opacity duration-200 ease-out ${isMobilePanelOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`}
+                role="dialog"
+                aria-modal="true"
+                aria-hidden={!isMobilePanelOpen}
             >
-                {cardContent}
-            </Card>
-        </aside>
+                <div
+                    className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"
+                    onClick={() => setIsMobilePanelOpen(false)}
+                    aria-hidden="true"
+                />
+                <div
+                    className={`absolute left-0 top-0 flex h-full max-w-full transform-gpu transition-transform duration-300 ease-out ${isMobilePanelOpen ? 'translate-x-0' : '-translate-x-full'}`}
+                >
+                    <Card
+                        radius="xl"
+                        padding="lg"
+                        withBorder
+                        className="flex h-full w-[min(360px,90vw)] flex-col"
+                        style={CARD_STYLE}
+                    >
+                        <div className="mb-2 flex items-center justify-between">
+                            <Text size="sm" fw={700}>
+                                스트리머 필터
+                            </Text>
+                            <button
+                                type="button"
+                                onClick={() => setIsMobilePanelOpen(false)}
+                                className="rounded-full p-1 text-slate-300 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-300/60"
+                                aria-label="스트리머 필터 닫기"
+                            >
+                                <CloseIcon className="h-5 w-5" />
+                            </button>
+                        </div>
+                        {renderFilterBody({ className: 'mt-2' })}
+                    </Card>
+                </div>
+            </div>
+        </>
     );
 }
 

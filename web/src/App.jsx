@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, Routes, Route, Navigate } from 'react-router-dom';
+import { NavLink, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import MapPage from './pages/Map/MapPage.jsx';
 import TimelinePage from './pages/Timeline/TimelinePage.jsx';
 
@@ -31,6 +31,19 @@ const ClockIcon = (props) => (
   </svg>
 );
 
+
+const StreamerIcon = (props) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true" {...props}>
+    <circle cx="12" cy="7.5" r="3.5" strokeWidth="1.5" />
+    <path
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M6 19.5c0-3.037 2.686-5.5 6-5.5s6 2.463 6 5.5"
+    />
+  </svg>
+);
+
 const navItems = [
   { to: '/map', label: '치지직 맵', Icon: MapPinIcon },
   { to: '/timeline', label: '치지직 타임라인', Icon: ClockIcon },
@@ -51,27 +64,47 @@ const externalLinks = [
 
 const App = () => {
   const [isInfoOpen, setIsInfoOpen] = useState(false);
+  const location = useLocation();
+  const isTimelinePage = location.pathname.startsWith('/timeline');
+
+  const handleOpenMobileFilter = () => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new Event('open-streamer-filter'));
+  };
 
   return (
     <div className="min-h-screen text-white">
-      <nav className="fixed left-1/2 top-6 z-50 flex -translate-x-1/2 items-center gap-3 lg:gap-6 rounded-full bg-slate-900/80 px-5 lg:px-8 py-2 lg:py-3 text-sm font-semibold shadow-lg backdrop-blur">
+      <nav className="fixed left-1/2 top-6 z-50 flex -translate-x-[52%] items-center gap-3 rounded-full bg-slate-900/80 px-4 lg:-translate-x-1/2 lg:gap-6 lg:px-8 py-2 lg:py-3 text-sm font-semibold shadow-lg backdrop-blur">
         <div className="flex items-center gap-2.5 lg:gap-6">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              aria-label={item.label}
-              className={({ isActive }) =>
-                [
-                  'inline-flex items-center justify-center lg:justify-start gap-2 rounded-full px-3 py-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-300/60',
-                  isActive ? 'text-teal-300' : 'text-slate-300 hover:text-white',
-                ].join(' ')
-              }
+          {isTimelinePage ? (
+            <button
+              type="button"
+              onClick={handleOpenMobileFilter}
+              className="inline-flex h-9 flex-shrink-0 items-center gap-2 rounded-full border border-slate-700/70 bg-slate-900/80 px-3 text-xs font-semibold text-slate-100 transition hover:bg-slate-800/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-300/60 whitespace-nowrap lg:hidden"
+              aria-label="스트리머 필터 열기"
             >
-              <item.Icon className="h-5 w-5 flex-none" />
-              <span className="hidden lg:inline">{item.label}</span>
-            </NavLink>
-          ))}
+              <StreamerIcon className="h-5 w-5 text-teal-300" />
+              <span>스트리머 필터</span>
+            </button>
+          ) : null}
+          <div className="flex items-center gap-2.5 lg:gap-6">
+            {navItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                aria-label={item.label}
+                className={({ isActive }) =>
+                  [
+                    'inline-flex items-center justify-center lg:justify-start gap-2 rounded-full px-3 py-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-300/60',
+                    isActive ? 'text-teal-300' : 'text-slate-300 hover:text-white',
+                  ].join(' ')
+                }
+              >
+                <item.Icon className="h-5 w-5 flex-none" />
+                <span className="hidden lg:inline">{item.label}</span>
+              </NavLink>
+            ))}
+          </div>
         </div>
         <span className="hidden h-6 w-px bg-slate-700/80 lg:inline-block" aria-hidden />
         <div className="flex items-center gap-3 lg:gap-4">
