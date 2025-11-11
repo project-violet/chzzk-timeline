@@ -751,7 +751,7 @@ export function TimelineTracks({
 
                 if (interaction.type === 'pan') {
                     const span = interaction.viewRangeAtStart.end - interaction.viewRangeAtStart.start;
-                    if (span > 0) {
+                    if (span > 0 && pointerX > 0) {
                         const deltaPx = pointerX - interaction.startPx;
                         const deltaTime = (deltaPx / rect.width) * span;
                         const nextStart = interaction.viewRangeAtStart.start - deltaTime;
