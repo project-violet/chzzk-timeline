@@ -19,7 +19,18 @@ const EmptyTimelinePlaceholder = () => (
     </div>
 );
 
-const TimelineAxisHeader = ({ axisRef, selectionBox, axisTicks, viewRange, viewSpan, clamp, isMobile, handleTouchEnd }) => {
+const TimelineAxisHeader = ({
+    axisRef,
+    selectionBox,
+    axisTicks,
+    viewRange,
+    viewSpan,
+    clamp,
+    isMobile,
+    handleTouchEnd,
+    showHoverGuide,
+    onToggleHoverGuide,
+}) => {
     const stickyRef = useRef(null);
     const stickyStartOffsetRef = useRef(0);
     const [overlayOpacity, setOverlayOpacity] = useState(0);
@@ -79,40 +90,98 @@ const TimelineAxisHeader = ({ axisRef, selectionBox, axisTicks, viewRange, viewS
                     aria-hidden="true"
                 />
                 <div className="relative pb-3">
-                    <div
-                        className={`grid items-end gap-2 text-xs text-slate-400 ${isMobile ? 'grid-cols-[92px_minmax(0,1fr)]' : 'grid-cols-[220px_minmax(0,1fr)]'
-                            }`}
-                    >
-                        <Text size="xs" fw={600} c="dimmed" className="uppercase tracking-wide">
-                            스트리머
-                        </Text>
-                        <div ref={axisRef} className="relative h-12" onClick={handleTouchEnd}>
-                            {selectionBox ? (
-                                <div
-                                    className="pointer-events-none absolute inset-y-0 rounded-md bg-teal-400/10 ring-1 ring-teal-400/40"
-                                    style={{
-                                        left: `${clamp(selectionBox.leftPercent, 0, 100)}%`,
-                                        width: `${clamp(selectionBox.widthPercent, 0, 100)}%`,
-                                    }}
-                                />
-                            ) : null}
-                            <div className="absolute bottom-0 left-0 right-0 border-b border-slate-800" />
-                            {axisTicks.map((tick, index) => {
-                                const position = ((tick.date.getTime() - viewRange.start) / viewSpan) * 100;
-                                if (position < 0 || position > 98) return null;
-                                return (
+                    {isMobile ? (
+                        <div className="grid items-end gap-2 text-xs text-slate-400 grid-cols-[92px_minmax(0,1fr)]">
+                            <Text size="xs" fw={600} c="dimmed" className="uppercase tracking-wide">
+                                스트리머
+                            </Text>
+                            <div ref={axisRef} className="relative h-12" onClick={handleTouchEnd}>
+                                {selectionBox ? (
                                     <div
-                                        key={tick.date.getTime()}
-                                        className="absolute bottom-0 flex translate-x-[-50%] flex-col items-center"
-                                        style={{ left: `${clamp(position, 0, 100)}%` }}
-                                    >
-                                        <div className="h-3 w-px bg-slate-700" />
-                                        <span className="mt-1 whitespace-nowrap text-[11px] text-slate-400">{tick.label}</span>
-                                    </div>
-                                );
-                            })}
+                                        className="pointer-events-none absolute inset-y-0 rounded-md bg-teal-400/10 ring-1 ring-teal-400/40"
+                                        style={{
+                                            left: `${clamp(selectionBox.leftPercent, 0, 100)}%`,
+                                            width: `${clamp(selectionBox.widthPercent, 0, 100)}%`,
+                                        }}
+                                    />
+                                ) : null}
+                                <div className="absolute bottom-0 left-0 right-0 border-b border-slate-800" />
+                                {axisTicks.map((tick) => {
+                                    const position = ((tick.date.getTime() - viewRange.start) / viewSpan) * 100;
+                                    if (position < 0 || position > 98) return null;
+                                    return (
+                                        <div
+                                            key={tick.date.getTime()}
+                                            className="absolute bottom-0 flex translate-x-[-50%] flex-col items-center"
+                                            style={{ left: `${clamp(position, 0, 100)}%` }}
+                                        >
+                                            <div className="h-3 w-px bg-slate-700" />
+                                            <span className="mt-1 whitespace-nowrap text-[11px] text-slate-400">{tick.label}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="grid items-end gap-2 text-xs text-slate-400 grid-cols-[220px_minmax(0,1fr)]">
+                            <div className="flex items-center justify-start">
+                                <Text size="xs" fw={600} c="dimmed" className="uppercase tracking-wide">
+                                    스트리머
+                                </Text>
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <div className="flex items-center justify-end">
+                                    <div className="flex ml-auto">
+                                        <button
+                                            type="button"
+                                            onPointerDown={(event) => event.stopPropagation()}
+                                            onPointerMove={(event) => event.stopPropagation()}
+                                            onPointerUp={(event) => event.stopPropagation()}
+                                            onClick={() => onToggleHoverGuide(!showHoverGuide)}
+                                            aria-pressed={showHoverGuide}
+                                            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-300/60 ${showHoverGuide
+                                                ? 'border-teal-400/50 bg-teal-400/10 text-teal-100'
+                                                : 'border-slate-700/70 bg-slate-800/70 text-slate-400'
+                                                }`}
+                                            aria-label="타임라인 가이드 선 토글"
+                                        >
+                                            <span>가이드 선</span>
+                                            <span
+                                                className={`h-2.5 w-2.5 rounded-full transition-all duration-200 ease-out ${showHoverGuide ? 'bg-teal-300 shadow-[0_0_10px_rgba(45,212,191,0.6)]' : 'bg-slate-500'
+                                                    }`}
+                                            />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div ref={axisRef} className="relative h-12" onClick={handleTouchEnd}>
+                                    {selectionBox ? (
+                                        <div
+                                            className="pointer-events-none absolute inset-y-0 rounded-md bg-teal-400/10 ring-1 ring-teal-400/40"
+                                            style={{
+                                                left: `${clamp(selectionBox.leftPercent, 0, 100)}%`,
+                                                width: `${clamp(selectionBox.widthPercent, 0, 100)}%`,
+                                            }}
+                                        />
+                                    ) : null}
+                                    <div className="absolute bottom-0 left-0 right-0 border-b border-slate-800" />
+                                    {axisTicks.map((tick) => {
+                                        const position = ((tick.date.getTime() - viewRange.start) / viewSpan) * 100;
+                                        if (position < 0 || position > 98) return null;
+                                        return (
+                                            <div
+                                                key={tick.date.getTime()}
+                                                className="absolute bottom-0 flex translate-x-[-50%] flex-col items-center"
+                                                style={{ left: `${clamp(position, 0, 100)}%` }}
+                                            >
+                                                <div className="h-3 w-px bg-slate-700" />
+                                                <span className="mt-1 whitespace-nowrap text-[11px] text-slate-400">{tick.label}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -219,6 +288,7 @@ const TimelineCanvas = ({
     showTooltip,
     hideTooltip,
     isMobile,
+    hoverPosition,
 }) => {
     const timelineHeight = channelRows.length * rowHeight;
     const linkTapRef = useRef(new Map());
@@ -274,6 +344,12 @@ const TimelineCanvas = ({
                         />
                     );
                 })}
+                {hoverPosition !== null ? (
+                    <div
+                        className="absolute inset-y-0 border-l border-teal-200/45"
+                        style={{ left: `${clamp(hoverPosition, 0, 100)}%` }}
+                    />
+                ) : null}
                 {channelRows.map((_, rowIndex) => (
                     <div
                         key={`h-${rowIndex}`}
@@ -433,6 +509,8 @@ export function TimelineTracks({
         if (typeof window === 'undefined') return false;
         return !window.matchMedia('(min-width: 1024px)').matches;
     });
+    const [hoverPosition, setHoverPosition] = useState(null);
+    const [showHoverGuide, setShowHoverGuide] = useState(true);
 
     useEffect(() => {
         if (typeof window === 'undefined') return undefined;
@@ -449,6 +527,12 @@ export function TimelineTracks({
             mediaQuery.removeEventListener('change', handleChange);
         };
     }, []);
+
+    useEffect(() => {
+        if (isMobile) {
+            setShowHoverGuide(false);
+        }
+    }, [isMobile]);
 
     const { minTime, maxTime, span: boundsSpan } = bounds;
     const activeRange = draftRange ?? viewRange;
@@ -633,10 +717,13 @@ export function TimelineTracks({
 
     const handlePointerDown = useCallback(
         (event) => {
+            const surfaceElement = surfaceRef.current;
+            if (!surfaceElement) return;
+
             if (event.pointerType === 'touch') {
+                setHoverPosition(null);
                 updateTouchPointer(event);
-                const surfaceElement = surfaceRef.current;
-                surfaceElement?.setPointerCapture?.(event.pointerId);
+                surfaceElement.setPointerCapture?.(event.pointerId);
                 if (pointerStateRef.current.pinch || pointerStateRef.current.pointers.size >= 2) {
                     if (startPinchIfPossible()) {
                         event.preventDefault();
@@ -647,8 +734,7 @@ export function TimelineTracks({
 
             if (event.button !== 0 && event.pointerType !== 'touch') return;
             const axisElement = axisRef.current;
-            const surfaceElement = surfaceRef.current;
-            if (!axisElement || !surfaceElement) return;
+            if (!axisElement) return;
 
             const linkTarget = event.target.closest('a[data-timeline-link="true"]');
             if (linkTarget) {
@@ -661,6 +747,7 @@ export function TimelineTracks({
             hideTooltip();
             event.preventDefault();
             const pointerX = clamp(event.clientX - rect.left, 0, rect.width);
+            const pointerY = event.clientY;
             const isAxisArea = axisElement.contains(event.target);
             const interactionType = event.shiftKey || isAxisArea ? 'select' : 'pan';
 
@@ -668,6 +755,7 @@ export function TimelineTracks({
                 type: interactionType,
                 pointerId: event.pointerId,
                 startPx: pointerX,
+                startClientY: pointerY,
                 viewRangeAtStart: { ...activeRange },
             };
 
@@ -678,13 +766,28 @@ export function TimelineTracks({
                 });
             }
 
+            if (event.pointerType === 'mouse') {
+                if (!showHoverGuide) {
+                    setHoverPosition(null);
+                } else {
+                    const surfaceRect = surfaceElement.getBoundingClientRect();
+                    if (surfaceRect.width > 0) {
+                        const percent = clamp((event.clientX - surfaceRect.left) / surfaceRect.width, 0, 1) * 100;
+                        setHoverPosition(percent);
+                    }
+                }
+            }
+
             surfaceElement.setPointerCapture?.(event.pointerId);
         },
-        [activeRange, clamp, hideTooltip, startPinchIfPossible, updateTouchPointer]
+        [activeRange, clamp, hideTooltip, isMobile, setHoverPosition, showHoverGuide, startPinchIfPossible, updateTouchPointer]
     );
 
     const handlePointerMove = useCallback(
         (event) => {
+            const surfaceElement = surfaceRef.current;
+            if (!surfaceElement) return;
+
             if (event.pointerType === 'touch') {
                 updateTouchPointer(event);
                 const pointerState = pointerStateRef.current;
@@ -692,33 +795,75 @@ export function TimelineTracks({
                     if (startPinchIfPossible()) {
                         event.preventDefault();
                         handlePinchMove();
+                        setHoverPosition(null);
                         return;
                     }
                 }
                 if (pointerState.pinch) {
                     event.preventDefault();
                     handlePinchMove();
+                    setHoverPosition(null);
                     return;
                 }
             }
 
-            const interaction = interactionRef.current;
-            if (!interaction || interaction.pointerId !== event.pointerId) return;
-
             const axisElement = axisRef.current;
             if (!axisElement) return;
 
-            const rect = axisElement.getBoundingClientRect();
-            if (rect.width <= 0) return;
+            const axisRect = axisElement.getBoundingClientRect();
+            const surfaceRect = surfaceElement.getBoundingClientRect();
+            if (axisRect.width <= 0 || surfaceRect.width <= 0) {
+                setHoverPosition(null);
+                return;
+            }
 
-            const pointerX = clamp(event.clientX - rect.left, 0, rect.width);
+            const interaction = interactionRef.current;
+            if (!interaction || interaction.pointerId !== event.pointerId) {
+                if (event.pointerType === 'mouse') {
+                    if (!showHoverGuide || isMobile) {
+                        setHoverPosition(null);
+                    } else {
+                        const withinBounds =
+                            event.clientX >= axisRect.left &&
+                            event.clientX <= axisRect.right &&
+                            event.clientY >= surfaceRect.top &&
+                            event.clientY <= surfaceRect.bottom;
+
+                        if (withinBounds) {
+                            const percent = clamp((event.clientX - axisRect.left) / axisRect.width, 0, 1) * 100;
+                            setHoverPosition(percent);
+                        } else {
+                            setHoverPosition(null);
+                        }
+                    }
+                }
+                return;
+            }
+
+            if (event.pointerType === 'touch') {
+                const deltaX = Math.abs(event.clientX - interaction.startPx) * window.devicePixelRatio;
+                const deltaY = Math.abs(event.clientY - interaction.startClientY) * window.devicePixelRatio;
+                if (deltaY > deltaX && deltaY > 6) {
+                    interactionRef.current = null;
+                    setSelectionBox(null);
+                    try {
+                        surfaceElement.releasePointerCapture?.(event.pointerId);
+                    } catch {
+                        // ignore errors releasing pointer capture
+                    }
+                    setHoverPosition(null);
+                    return;
+                }
+            }
+
+            const pointerX = clamp(event.clientX - axisRect.left, 0, axisRect.width);
 
             if (interaction.type === 'pan') {
                 const span = interaction.viewRangeAtStart.end - interaction.viewRangeAtStart.start;
                 if (span <= 0) return;
 
                 const deltaPx = pointerX - interaction.startPx;
-                const deltaTime = (deltaPx / rect.width) * span;
+                const deltaTime = (deltaPx / axisRect.width) * span;
 
                 const nextStart = interaction.viewRangeAtStart.start - deltaTime;
                 const nextEnd = interaction.viewRangeAtStart.end - deltaTime;
@@ -728,16 +873,25 @@ export function TimelineTracks({
                 const startPx = interaction.startPx;
                 const leftPx = Math.min(startPx, pointerX);
                 const rightPx = Math.max(startPx, pointerX);
-                const leftPercent = (leftPx / rect.width) * 100;
-                const widthPercent = ((rightPx - leftPx) / rect.width) * 100;
+                const leftPercent = (leftPx / axisRect.width) * 100;
+                const widthPercent = ((rightPx - leftPx) / axisRect.width) * 100;
 
                 setSelectionBox({
                     leftPercent: clamp(leftPercent, 0, 100),
                     widthPercent: clamp(widthPercent, 0, 100),
                 });
             }
+
+            if (event.pointerType === 'mouse') {
+                if (showHoverGuide && !isMobile) {
+                    const percent = clamp((event.clientX - axisRect.left) / axisRect.width, 0, 1) * 100;
+                    setHoverPosition(percent);
+                } else {
+                    setHoverPosition(null);
+                }
+            }
         },
-        [clamp, enforceRange, handlePinchMove, startPinchIfPossible, updateTouchPointer]
+        [clamp, enforceRange, handlePinchMove, isMobile, setHoverPosition, showHoverGuide, startPinchIfPossible, updateTouchPointer]
     );
 
     const finalizeInteraction = useCallback(
@@ -757,6 +911,7 @@ export function TimelineTracks({
                     } catch {
                         // ignore
                     }
+                    setHoverPosition(null);
                     return;
                 }
             }
@@ -813,8 +968,11 @@ export function TimelineTracks({
             }
 
             setDraftRange(null);
+            if (event.pointerType === 'mouse') {
+                setHoverPosition(null);
+            }
         },
-        [clamp, enforceRange, finishPinch, hideTooltip, onViewRangeChange, removeTouchPointer]
+        [clamp, enforceRange, finishPinch, hideTooltip, onViewRangeChange, removeTouchPointer, setHoverPosition]
     );
 
     const handleResetView = useCallback(() => {
@@ -823,6 +981,7 @@ export function TimelineTracks({
         hideTooltip();
         onResetView();
         setDraftRange(null);
+        setHoverPosition(null);
     }, [hideTooltip, onResetView]);
 
     // 모바일에서 더블 클릭 허용하기 위해 
@@ -848,6 +1007,7 @@ export function TimelineTracks({
             onPointerMove={handlePointerMove}
             onPointerUp={finalizeInteraction}
             onPointerCancel={finalizeInteraction}
+            onPointerLeave={() => setHoverPosition(null)}
             onDoubleClick={handleResetView}
         >
             <TimelineAxisHeader
@@ -859,6 +1019,8 @@ export function TimelineTracks({
                 clamp={clamp}
                 isMobile={isMobile}
                 handleTouchEnd={handleTouchEnd}
+                showHoverGuide={showHoverGuide}
+                onToggleHoverGuide={setShowHoverGuide}
             />
 
             <div
@@ -879,6 +1041,7 @@ export function TimelineTracks({
                     showTooltip={showTooltip}
                     hideTooltip={hideTooltip}
                     isMobile={isMobile}
+                    hoverPosition={showHoverGuide ? hoverPosition : null}
                 />
             </div>
 
