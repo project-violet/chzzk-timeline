@@ -399,6 +399,7 @@ export function TimelineTracks({
     const [draftRange, setDraftRange] = useState(null);
     const [selectionBox, setSelectionBox] = useState(null);
     const [tooltip, setTooltip] = useState(null);
+    const pointerStateRef = useRef({ pointers: new Map(), pinch: null });
     const [isMobile, setIsMobile] = useState(() => {
         if (typeof window === 'undefined') return false;
         return !window.matchMedia('(min-width: 1024px)').matches;
@@ -465,6 +466,17 @@ export function TimelineTracks({
         [boundsSpan, maxTime, minTime, minViewSpan]
     );
 
+    const updateTouchPointer = useCallback((event) => {
+        if (event.pointerType !== 'touch') return;
+        pointerStateRef.current.pointers.set(event.pointerId, {
+            clientX: event.clientX,
+        });
+    }, []);
+
+    const removeTouchPointer = useCallback((pointerId) => {
+        pointerStateRef.current.pointers.delete(pointerId);
+    }, []);
+
     const hideTooltip = useCallback(() => {
         setTooltip(null);
     }, []);
@@ -472,6 +484,88 @@ export function TimelineTracks({
     useEffect(() => {
         hideTooltip();
     }, [hideTooltip, viewRange.start, viewRange.end, channelRows]);
+
+    const startPinchIfPossible = useCallback(() => {
+        const pointerState = pointerStateRef.current;
+        if (pointerState.pinch) return true;
+        if (pointerState.pointers.size < 2) return false;
+
+        const axisElement = axisRef.current;
+        if (!axisElement) return false;
+        const rect = axisElement.getBoundingClientRect();
+        if (rect.width <= 0) return false;
+
+        const entries = Array.from(pointerState.pointers.entries());
+        const lastIndex = entries.length - 1;
+        if (lastIndex < 1) return false;
+        const [idB, pointerB] = entries[lastIndex];
+        const [idA, pointerA] = entries[lastIndex - 1];
+
+        const posA = clamp(pointerA.clientX - rect.left, 0, rect.width);
+        const posB = clamp(pointerB.clientX - rect.left, 0, rect.width);
+        const initialDistance = Math.abs(posA - posB);
+        if (initialDistance < 8) return false;
+
+        const centerPx = (posA + posB) / 2;
+        const centerRatio = clamp(centerPx / rect.width, 0, 1);
+
+        pointerState.pinch = {
+            pointerIds: [idA, idB],
+            initialDistance,
+            startSpan: activeViewSpan,
+            startViewRange: activeRange,
+            lastRange: activeRange,
+            initialCenterRatio: centerRatio,
+        };
+
+        interactionRef.current = null;
+        setSelectionBox(null);
+        hideTooltip();
+        return true;
+    }, [activeRange, activeViewSpan, clamp, hideTooltip]);
+
+    const handlePinchMove = useCallback(() => {
+        const pinch = pointerStateRef.current.pinch;
+        if (!pinch) return false;
+        const axisElement = axisRef.current;
+        if (!axisElement) return false;
+        const rect = axisElement.getBoundingClientRect();
+        if (rect.width <= 0) return false;
+
+        const pointers = pinch.pointerIds.map((id) => pointerStateRef.current.pointers.get(id));
+        if (pointers.some((pointer) => !pointer)) return false;
+
+        const posA = clamp(pointers[0].clientX - rect.left, 0, rect.width);
+        const posB = clamp(pointers[1].clientX - rect.left, 0, rect.width);
+        const distance = Math.max(Math.abs(posA - posB), 8);
+
+        let nextSpan = pinch.startSpan * (pinch.initialDistance / distance);
+        nextSpan = Math.max(nextSpan, minViewSpan);
+        nextSpan = Math.min(nextSpan, boundsSpan);
+
+        const centerPx = (posA + posB) / 2;
+        const centerRatio = clamp(centerPx / rect.width, 0, 1);
+        const centerTime = pinch.startViewRange.start + pinch.startSpan * centerRatio;
+        const range = enforceRange(centerTime - nextSpan / 2, centerTime + nextSpan / 2);
+
+        pointerStateRef.current.pinch.lastRange = range;
+        setDraftRange(range);
+        return true;
+    }, [boundsSpan, clamp, enforceRange, minViewSpan]);
+
+    const finishPinch = useCallback(
+        (shouldCommit) => {
+            const pinch = pointerStateRef.current.pinch;
+            if (!pinch) return;
+            const range = pinch.lastRange ?? pinch.startViewRange;
+            pointerStateRef.current.pinch = null;
+            setDraftRange(null);
+            if (shouldCommit && range) {
+                onViewRangeChange(range);
+            }
+        },
+        [onViewRangeChange]
+    );
 
     const showTooltip = useCallback(
         (event, channel, replay) => {
@@ -510,6 +604,18 @@ export function TimelineTracks({
 
     const handlePointerDown = useCallback(
         (event) => {
+            if (event.pointerType === 'touch') {
+                updateTouchPointer(event);
+                const surfaceElement = surfaceRef.current;
+                surfaceElement?.setPointerCapture?.(event.pointerId);
+                if (pointerStateRef.current.pinch || pointerStateRef.current.pointers.size >= 2) {
+                    if (startPinchIfPossible()) {
+                        event.preventDefault();
+                        return;
+                    }
+                }
+            }
+
             if (event.button !== 0) return;
             const axisElement = axisRef.current;
             const surfaceElement = surfaceRef.current;
@@ -545,11 +651,28 @@ export function TimelineTracks({
 
             surfaceElement.setPointerCapture?.(event.pointerId);
         },
-        [activeRange, clamp, hideTooltip]
+        [activeRange, clamp, hideTooltip, startPinchIfPossible, updateTouchPointer]
     );
 
     const handlePointerMove = useCallback(
         (event) => {
+            if (event.pointerType === 'touch') {
+                updateTouchPointer(event);
+                const pointerState = pointerStateRef.current;
+                if (!pointerState.pinch && pointerState.pointers.size >= 2) {
+                    if (startPinchIfPossible()) {
+                        event.preventDefault();
+                        handlePinchMove();
+                        return;
+                    }
+                }
+                if (pointerState.pinch) {
+                    event.preventDefault();
+                    handlePinchMove();
+                    return;
+                }
+            }
+
             const interaction = interactionRef.current;
             if (!interaction || interaction.pointerId !== event.pointerId) return;
 
@@ -585,11 +708,30 @@ export function TimelineTracks({
                 });
             }
         },
-        [clamp, enforceRange]
+        [clamp, enforceRange, handlePinchMove, startPinchIfPossible, updateTouchPointer]
     );
 
     const finalizeInteraction = useCallback(
         (event) => {
+            if (event.pointerType === 'touch') {
+                removeTouchPointer(event.pointerId);
+                const pinch = pointerStateRef.current.pinch;
+                if (pinch) {
+                    const remaining = pinch.pointerIds.filter((id) => pointerStateRef.current.pointers.has(id));
+                    if (remaining.length < 2) {
+                        finishPinch(true);
+                    }
+
+                    const surfaceElementTouch = surfaceRef.current;
+                    try {
+                        surfaceElementTouch?.releasePointerCapture?.(event.pointerId);
+                    } catch {
+                        // ignore
+                    }
+                    return;
+                }
+            }
+
             const interaction = interactionRef.current;
             if (!interaction || interaction.pointerId !== event.pointerId) return;
 
@@ -643,7 +785,7 @@ export function TimelineTracks({
 
             setDraftRange(null);
         },
-        [clamp, enforceRange, hideTooltip, onViewRangeChange]
+        [clamp, enforceRange, finishPinch, hideTooltip, onViewRangeChange, removeTouchPointer]
     );
 
     const handleResetView = useCallback(() => {
