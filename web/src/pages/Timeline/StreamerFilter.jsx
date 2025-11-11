@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Avatar, Badge, Button, Card, Checkbox, Group, ScrollArea, Stack, Text, TextInput } from '@mantine/core';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { hangulToKeystrokes, levenshteinDistance } from '../../utils/hangul';
@@ -27,6 +27,21 @@ const getInitials = (name = '') => {
 
 const CHANNEL_ROW_HEIGHT = 60;
 
+const ChevronIcon = ({ collapsed }) => (
+    <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={`h-5 w-5 flex-none transition-transform duration-150 ease-out ${collapsed ? '-rotate-90' : 'rotate-0'}`}
+        aria-hidden="true"
+    >
+        <path d="M6 9l6 6 6-6" />
+    </svg>
+);
+
 export function StreamerFilter({
     channels = [],
     selectedChannelIds,
@@ -40,6 +55,13 @@ export function StreamerFilter({
     const viewportRef = useRef(null);
 
     const [filterText, setFilterText] = useState('');
+    const [isCollapsed, setIsCollapsed] = useState(() => {
+        if (typeof window === 'undefined') {
+            return false;
+        }
+        return !window.matchMedia(DESKTOP_MEDIA_QUERY).matches;
+    });
+    const contentId = useId();
 
     const channelMetadata = useMemo(() => {
         return channels.map((channel, index) => {
@@ -100,6 +122,13 @@ export function StreamerFilter({
         };
     }, []);
 
+    useEffect(() => {
+        setIsCollapsed((prev) => {
+            const next = !isFixedLayout;
+            return prev === next ? prev : next;
+        });
+    }, [isFixedLayout]);
+
     useLayoutEffect(() => {
         if (!isFixedLayout || typeof window === 'undefined') return undefined;
 
@@ -128,123 +157,135 @@ export function StreamerFilter({
     }, [isFixedLayout]);
 
     const cardContent = (
-        <Stack gap="sm" className="h-full">
-            <div>
+        <div className="flex h-full flex-col">
+            <button
+                type="button"
+                onClick={() => setIsCollapsed((prev) => !prev)}
+                aria-expanded={!isCollapsed}
+                aria-controls={contentId}
+                className="flex items-center justify-between rounded-lg px-1 py-1 text-left text-slate-100 transition hover:text-teal-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-300/60"
+            >
                 <Text size="sm" fw={700}>
                     스트리머 필터
                 </Text>
-                <Text size="xs" c="dimmed" mt={4}>
-                    검색하거나 체크해 원하는 스트리머만 타임라인에 표시해 보세요.
-                </Text>
-            </div>
+                <ChevronIcon collapsed={isCollapsed} />
+            </button>
 
-            <TextInput
-                value={filterText}
-                onChange={(event) => setFilterText(event.currentTarget.value)}
-                placeholder="스트리머 검색"
-                radius="lg"
-                size="sm"
-                variant="filled"
-            />
+            {!isCollapsed ? (
+                <Stack gap="sm" id={contentId} className="mt-3 flex-1" style={{ minHeight: 0 }}>
+                    <Text size="xs" c="dimmed">
+                        검색하거나 체크해 원하는 스트리머만 타임라인에 표시해 보세요.
+                    </Text>
 
-            <Group justify="space-between" align="center" gap="xs">
-                <Badge size="sm" radius="lg" variant="light" color={selectedCount ? 'teal' : 'gray'}>
-                    선택 {selectedCount.toLocaleString('ko-KR')}명
-                </Badge>
-                <Button
-                    variant="subtle"
-                    color="gray"
-                    size="xs"
-                    radius="lg"
-                    onClick={() => onResetSelection?.()}
-                    disabled={selectedChannelIds.length === 0}
-                >
-                    선택 초기화
-                </Button>
-            </Group>
+                    <TextInput
+                        value={filterText}
+                        onChange={(event) => setFilterText(event.currentTarget.value)}
+                        placeholder="스트리머 검색"
+                        radius="lg"
+                        size="sm"
+                        variant="filled"
+                    />
 
-            <ScrollArea style={{ flex: 1 }} type="auto" offsetScrollbars viewportRef={viewportRef}>
-                {isEmpty ? (
-                    <div
-                        className="flex h-32 items-center justify-center rounded-xl border"
-                        style={EMPTY_STATE_STYLE}
-                    >
-                        <Text size="xs" c="dimmed">
-                            검색 결과가 없습니다.
-                        </Text>
-                    </div>
-                ) : (
-                    <div style={{ height: totalSize, position: 'relative', paddingRight: '0.5rem' }}>
-                        {virtualItems.map((virtualRow) => {
-                            const item = sidebarItems[virtualRow.index];
-                            if (!item || !item.channel) return null;
+                    <Group justify="space-between" align="center" gap="xs">
+                        <Badge size="sm" radius="lg" variant="light" color={selectedCount ? 'teal' : 'gray'}>
+                            선택 {selectedCount.toLocaleString('ko-KR')}명
+                        </Badge>
+                        <Button
+                            variant="subtle"
+                            color="gray"
+                            size="xs"
+                            radius="lg"
+                            onClick={() => onResetSelection?.()}
+                            disabled={selectedChannelIds.length === 0}
+                        >
+                            선택 초기화
+                        </Button>
+                    </Group>
 
-                            const { channel, id } = item;
-                            const channelName = typeof channel?.name === 'string' ? channel.name : '';
-                            const followerLabel = Number(channel?.follower ?? 0).toLocaleString('ko-KR');
+                    <ScrollArea style={{ flex: 1, minHeight: 0 }} type="auto" offsetScrollbars viewportRef={viewportRef}>
+                        {isEmpty ? (
+                            <div
+                                className="flex h-32 items-center justify-center rounded-xl border"
+                                style={EMPTY_STATE_STYLE}
+                            >
+                                <Text size="xs" c="dimmed">
+                                    검색 결과가 없습니다.
+                                </Text>
+                            </div>
+                        ) : (
+                            <div style={{ height: totalSize, position: 'relative', paddingRight: '0.5rem' }}>
+                                {virtualItems.map((virtualRow) => {
+                                    const item = sidebarItems[virtualRow.index];
+                                    if (!item || !item.channel) return null;
 
-                            return (
-                                <div
-                                    key={id}
-                                    data-index={virtualRow.index}
-                                    style={{
-                                        position: 'absolute',
-                                        top: 0,
-                                        left: 0,
-                                        width: '100%',
-                                        height: virtualRow.size,
-                                        transform: `translateY(${virtualRow.start}px)`,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        padding: '4px 0',
-                                    }}
-                                >
-                                    <label
-                                        htmlFor={`channel-${id}`}
-                                        className="flex h-full w-full cursor-pointer select-none items-center rounded-lg px-2 py-2 transition hover:bg-slate-800/50"
-                                        onMouseDown={(event) => event.preventDefault()}
-                                        onClick={(event) => {
-                                            if (event.target instanceof HTMLInputElement) return;
-                                            event.preventDefault();
-                                            onToggleChannel(id);
-                                        }}
-                                    >
-                                        <Checkbox
-                                            id={`channel-${id}`}
-                                            checked={selectedChannelIds.includes(id)}
-                                            onChange={() => onToggleChannel(id)}
-                                            radius="md"
-                                            styles={{
-                                                input: { cursor: 'pointer' },
+                                    const { channel, id } = item;
+                                    const channelName = typeof channel?.name === 'string' ? channel.name : '';
+                                    const followerLabel = Number(channel?.follower ?? 0).toLocaleString('ko-KR');
+
+                                    return (
+                                        <div
+                                            key={id}
+                                            data-index={virtualRow.index}
+                                            style={{
+                                                position: 'absolute',
+                                                top: 0,
+                                                left: 0,
+                                                width: '100%',
+                                                height: virtualRow.size,
+                                                transform: `translateY(${virtualRow.start}px)`,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                padding: '4px 0',
                                             }}
-                                            aria-label={`${channelName} 선택`}
-                                        />
-                                        <Group gap="sm" wrap="nowrap" ml="sm">
-                                            <Avatar
-                                                src={channel?.image ? `${channel.image}?type=f120_120_na` : undefined}
-                                                radius="xl"
-                                                size={40}
-                                                alt={channelName}
+                                        >
+                                            <label
+                                                htmlFor={`channel-${id}`}
+                                                className="flex h-full w-full cursor-pointer select-none items-center rounded-lg px-2 py-2 transition hover:bg-slate-800/50"
+                                                onMouseDown={(event) => event.preventDefault()}
+                                                onClick={(event) => {
+                                                    if (event.target instanceof HTMLInputElement) return;
+                                                    event.preventDefault();
+                                                    onToggleChannel(id);
+                                                }}
                                             >
-                                                {getInitials(channelName)}
-                                            </Avatar>
-                                            <div className="min-w-0">
-                                                <Text size="sm" fw={600} className="truncate">
-                                                    {channelName}
-                                                </Text>
-                                                <Text size="xs" c="dimmed">
-                                                    팔로워 {followerLabel}
-                                                </Text>
-                                            </div>
-                                        </Group>
-                                    </label>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </ScrollArea>
-        </Stack>
+                                                <Checkbox
+                                                    id={`channel-${id}`}
+                                                    checked={selectedChannelIds.includes(id)}
+                                                    onChange={() => onToggleChannel(id)}
+                                                    radius="md"
+                                                    styles={{
+                                                        input: { cursor: 'pointer' },
+                                                    }}
+                                                    aria-label={`${channelName} 선택`}
+                                                />
+                                                <Group gap="sm" wrap="nowrap" ml="sm">
+                                                    <Avatar
+                                                        src={channel?.image ? `${channel.image}?type=f120_120_na` : undefined}
+                                                        radius="xl"
+                                                        size={40}
+                                                        alt={channelName}
+                                                    >
+                                                        {getInitials(channelName)}
+                                                    </Avatar>
+                                                    <div className="min-w-0">
+                                                        <Text size="sm" fw={600} className="truncate">
+                                                            {channelName}
+                                                        </Text>
+                                                        <Text size="xs" c="dimmed">
+                                                            팔로워 {followerLabel}
+                                                        </Text>
+                                                    </div>
+                                                </Group>
+                                            </label>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </ScrollArea>
+                </Stack>
+            ) : null}
+        </div>
     );
 
     if (isFixedLayout) {
@@ -272,30 +313,29 @@ export function StreamerFilter({
                             {cardContent}
                         </Card>
                     </div>
-                ) : null}
-                <div className="lg:hidden">
+                ) : (
                     <Card
                         radius="xl"
                         padding="lg"
                         withBorder
                         className="flex flex-col"
-                        style={{ ...CARD_STYLE, marginTop: NAV_OFFSET }}
+                        style={{ ...CARD_STYLE, marginTop: NAV_OFFSET, maxHeight: FILTER_HEIGHT }}
                     >
                         {cardContent}
                     </Card>
-                </div>
+                )}
             </aside>
         );
     }
 
     return (
-        <aside className="sticky top-0 self-start" style={{ height: '100vh' }}>
+        <aside>
             <Card
                 radius="xl"
                 padding="lg"
                 withBorder
-                className="flex h-full flex-col"
-                style={{ ...CARD_STYLE, height: FILTER_HEIGHT, marginTop: NAV_OFFSET }}
+                className="flex w-full flex-col"
+                style={{ ...CARD_STYLE, marginTop: NAV_OFFSET, maxHeight: FILTER_HEIGHT }}
             >
                 {cardContent}
             </Card>
