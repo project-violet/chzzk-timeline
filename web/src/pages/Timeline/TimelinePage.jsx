@@ -356,22 +356,29 @@ const formatDuration = (durationMs) => {
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
-const getTickConfig = (spanMs) => {
-    if (spanMs > 540 * DAY_MS) return { unit: 'month', step: 3, showDate: true };
-    if (spanMs > 270 * DAY_MS) return { unit: 'month', step: 2, showDate: true };
-    if (spanMs > 120 * DAY_MS) return { unit: 'month', step: 1, showDate: true };
-    if (spanMs > 45 * DAY_MS) return { unit: 'day', step: 5, showDate: true };
-    if (spanMs > 21 * DAY_MS) return { unit: 'day', step: 2, showDate: true };
-    if (spanMs > 7 * DAY_MS) return { unit: 'day', step: 1, showDate: true };
-    if (spanMs > 48 * HOUR_MS) return { unit: 'hour', step: 6, showDate: true };
-    if (spanMs > 24 * HOUR_MS) return { unit: 'hour', step: 3, showDate: true };
-    if (spanMs > 12 * HOUR_MS) return { unit: 'hour', step: 2, showDate: true };
-    if (spanMs > 6 * HOUR_MS) return { unit: 'hour', step: 1, showDate: true };
-    if (spanMs > 3 * HOUR_MS) return { unit: 'minute', step: 30, showDate: true };
-    if (spanMs > 2 * HOUR_MS) return { unit: 'minute', step: 15, showDate: true };
-    if (spanMs > 60 * MINUTE_MS) return { unit: 'minute', step: 5, showDate: true };
-    if (spanMs > 30 * MINUTE_MS) return { unit: 'minute', step: 2, showDate: true };
-    return { unit: 'minute', step: 1, showDate: spanMs > 15 * MINUTE_MS };
+const getTickConfig = (spanMs, isMobile = false) => {
+    let baseConfig;
+    if (spanMs > 540 * DAY_MS) baseConfig = { unit: 'month', step: 3, showDate: true };
+    else if (spanMs > 270 * DAY_MS) baseConfig = { unit: 'month', step: 2, showDate: true };
+    else if (spanMs > 120 * DAY_MS) baseConfig = { unit: 'month', step: 1, showDate: true };
+    else if (spanMs > 45 * DAY_MS) baseConfig = { unit: 'day', step: 5, showDate: true };
+    else if (spanMs > 21 * DAY_MS) baseConfig = { unit: 'day', step: 2, showDate: true };
+    else if (spanMs > 7 * DAY_MS) baseConfig = { unit: 'day', step: 1, showDate: true };
+    else if (spanMs > 48 * HOUR_MS) baseConfig = { unit: 'hour', step: 12, showDate: true };
+    else if (spanMs > 24 * HOUR_MS) baseConfig = { unit: 'hour', step: 3, showDate: true };
+    else if (spanMs > 12 * HOUR_MS) baseConfig = { unit: 'hour', step: 2, showDate: true };
+    else if (spanMs > 6 * HOUR_MS) baseConfig = { unit: 'hour', step: 1, showDate: true };
+    else if (spanMs > 3 * HOUR_MS) baseConfig = { unit: 'minute', step: 30, showDate: true };
+    else if (spanMs > 2 * HOUR_MS) baseConfig = { unit: 'minute', step: 15, showDate: true };
+    else if (spanMs > 60 * MINUTE_MS) baseConfig = { unit: 'minute', step: 5, showDate: true };
+    else if (spanMs > 30 * MINUTE_MS) baseConfig = { unit: 'minute', step: 2, showDate: true };
+    else baseConfig = { unit: 'minute', step: 1, showDate: spanMs > 15 * MINUTE_MS };
+
+    if (!isMobile) return baseConfig;
+
+    console.log(spanMs, baseConfig);
+    const doubledStep = Math.max(baseConfig.step * 3, 1);
+    return { ...baseConfig, step: doubledStep };
 };
 
 const alignToStep = (time, unit, step) => {
@@ -702,13 +709,30 @@ const TimelinePage = () => {
     }, [filteredTimeline, replayKeywords, selectedCategories, selectedTags]);
 
     const [visibleCount, setVisibleCount] = useState(TIMELINE_BATCH);
+    const [isMobileViewport, setIsMobileViewport] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        return !window.matchMedia('(min-width: 1024px)').matches;
+    });
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return undefined;
+        const mediaQuery = window.matchMedia('(min-width: 1024px)');
+        const handleChange = () => {
+            setIsMobileViewport(!mediaQuery.matches);
+        };
+        handleChange();
+        mediaQuery.addEventListener('change', handleChange);
+        return () => {
+            mediaQuery.removeEventListener('change', handleChange);
+        };
+    }, []);
 
     useEffect(() => {
         setVisibleCount(TIMELINE_BATCH);
     }, [selectedChannelIds, replayKeywords, selectedCategories, selectedTags]);
 
     const viewSpan = Math.max(viewRange.end - viewRange.start, MIN_VIEW_SPAN);
-    const tickConfig = useMemo(() => getTickConfig(viewSpan), [viewSpan]);
+    const tickConfig = useMemo(() => getTickConfig(viewSpan, isMobileViewport), [viewSpan, isMobileViewport]);
     const axisTicks = useMemo(
         () =>
             generateTicks(viewRange.start, viewRange.end, tickConfig.unit, tickConfig.step).map((date) => ({

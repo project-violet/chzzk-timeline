@@ -97,8 +97,9 @@ const TimelineAxisHeader = ({ axisRef, selectionBox, axisTicks, viewRange, viewS
                                 />
                             ) : null}
                             <div className="absolute bottom-0 left-0 right-0 border-b border-slate-800" />
-                            {axisTicks.map((tick) => {
+                            {axisTicks.map((tick, index) => {
                                 const position = ((tick.date.getTime() - viewRange.start) / viewSpan) * 100;
+                                if (position < 0 || position > 98) return null;
                                 return (
                                     <div
                                         key={tick.date.getTime()}
