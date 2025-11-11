@@ -84,7 +84,7 @@ const TimelineAxisHeader = ({ axisRef, selectionBox, axisTicks, viewRange, viewS
                             }`}
                     >
                         <Text size="xs" fw={600} c="dimmed" className="uppercase tracking-wide">
-                            Streamer
+                            스트리머
                         </Text>
                         <div ref={axisRef} className="relative h-12" onClick={handleTouchEnd}>
                             {selectionBox ? (

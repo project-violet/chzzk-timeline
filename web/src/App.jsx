@@ -168,9 +168,9 @@ const App = () => {
               https://github.com/project-violet/chzzk-timeline
             </a>
             <div className="mt-6 space-y-2 text-sm text-slate-200">
-              <p>치지직 다시보기 정보를 스트리머 별로 타임라인으로 보여줍니다.</p>
-              <p>모든 정보는 누구나 접근 가능한 치지직 공개 API를 통해 얻고 있습니다.</p>
-              <p>이 프로젝트는 오픈소스이며 누구나 자유롭게 사용할 수 있습니다.</p>
+              <p>치지직 다시보기 정보를 스트리머 별로 타임라인으로 보여줍니다</p>
+              <p>모든 정보는 누구나 접근 가능한 치지직 공개 API를 통해 얻고 있습니다</p>
+              <p>이 프로젝트는 오픈소스이며 누구나 자유롭게 사용할 수 있습니다</p>
               <p>문의: violet.dev.master@gmail.com</p>
             </div>
           </div>
