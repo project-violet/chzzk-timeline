@@ -388,12 +388,13 @@ const TimelineCanvas = ({
 
                     const hasRoomForPadding = width >= 3; // about 1% width ~ few px depending on span
 
-                    // const videoUrl = `https://chzzk.naver.com/video/${replay.videoNo}`;
-                    const videoUrl = `/chat/${replay.videoNo}`;
-                    const linkKey = `${channel.channelId ?? channel.name}-${index}-${replay.startDate.toISOString()}`;
-
                     // video_with_chat_counts.json에 해당 비디오가 있는지 확인
                     const hasChatCounts = videoWithChatCounts?.has(String(replay.videoId)) || videoWithChatCounts?.has(String(replay.videoNo));
+
+                    const videoUrl = hasChatCounts
+                        ? `/chat/${replay.videoNo}`
+                        : `https://chzzk.naver.com/video/${replay.videoNo}`;
+                    const linkKey = `${channel.channelId ?? channel.name}-${index}-${replay.startDate.toISOString()}`;
 
                     // 주황색 계열 그라데이션 클래스 (chat counts가 있는 경우)
                     const gradientClass = hasChatCounts
