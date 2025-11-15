@@ -89,3 +89,70 @@ export const filterMessagesByKeyword = (messages, keyword) => {
     return messages.filter((msg) => msg.message.toLowerCase().includes(lowerKeyword));
 };
 
+/**
+ * 메시지에서 주요 키워드를 추출하고 빈도수에 따라 랭킹을 매김
+ */
+export const extractTopKeywords = (messages, topN = 20, minLength = 2) => {
+    if (!messages || messages.length === 0) {
+        return [];
+    }
+
+    // 불필요한 단어 필터링 (한 글자, 자주 쓰이는 단어 등)
+    const stopWords = new Set([
+        '가', '을', '를', '이', '그', '저', '와', '과', '의', '에', '에서', '로', '으로', '도', '만', '은', '는', '다', '요', '어', '아', '네', '음', '응', 'ㅋ', 'ㅎ', 'ㅠ', 'ㅜ', 'ㅇ', 'ㅂ', 'ㅅ', 'ㅈ', 'ㅊ', 'ㅌ', 'ㅍ', 'ㅎ',
+        '이', '것', '수', '하', '때', '년', '월', '일', '시', '분', '초', '게', '데', '게', '제', '님', '들'
+    ]);
+
+    const wordCount = new Map();
+    const wordUsers = new Map(); // 각 단어별로 말한 유저 Set 저장
+
+    // 각 메시지에서 단어 추출
+    for (const msg of messages) {
+        if (!msg.message || typeof msg.message !== 'string') continue;
+
+        // 한글 단어, 숫자, 영문 단어 추출 (2자 이상)
+        const words = msg.message.match(/[\uAC00-\uD7A3]{2,}|\d{2,}|[a-zA-Z]{2,}/g);
+
+        if (!words) continue;
+
+        // 하나의 메시지에서 같은 단어는 한 번만 카운트
+        const uniqueWordsInMessage = new Set();
+
+        for (const word of words) {
+            const lowerWord = word.toLowerCase();
+
+            // 불필요한 단어 스킵
+            if (stopWords.has(lowerWord)) continue;
+            if (lowerWord.length < minLength) continue;
+
+            // 이모지나 특수 문자만 있는 경우 스킵
+            if (/^[^\w가-힣]*$/.test(word)) continue;
+
+            // 이미 이 메시지에서 카운트한 단어는 스킵
+            if (uniqueWordsInMessage.has(lowerWord)) continue;
+            uniqueWordsInMessage.add(lowerWord);
+
+            // 빈도수 카운트
+            wordCount.set(lowerWord, (wordCount.get(lowerWord) || 0) + 1);
+
+            // 유저 추적
+            if (!wordUsers.has(lowerWord)) {
+                wordUsers.set(lowerWord, new Set());
+            }
+            wordUsers.get(lowerWord).add(msg.nickname);
+        }
+    }
+
+    // 빈도수에 따라 정렬하고 상위 N개 반환
+    const sorted = Array.from(wordCount.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, topN)
+        .map(([word, count]) => ({
+            word,
+            count,
+            uniqueUsers: wordUsers.get(word)?.size || 0
+        }));
+
+    return sorted;
+};
+

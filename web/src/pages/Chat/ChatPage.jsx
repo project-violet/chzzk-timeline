@@ -4,6 +4,7 @@ import { Container, Stack, Text } from '@mantine/core';
 import { VideoHeader } from './VideoHeader.jsx';
 import { VideoInfo } from './VideoInfo.jsx';
 import { ChatSearchSection } from './ChatSearchSection.jsx';
+import { ChatKeywordRanking } from './ChatKeywordRanking.jsx';
 
 const ChatPage = () => {
     const { videoId } = useParams();
@@ -20,6 +21,7 @@ const ChatPage = () => {
     const [chatLogText, setChatLogText] = useState(null);
     const [chatLogLoading, setChatLogLoading] = useState(false);
     const [chatLogError, setChatLogError] = useState(null);
+    const [searchKeyword, setSearchKeyword] = useState('');
 
     useEffect(() => {
         let aborted = false;
@@ -260,8 +262,8 @@ const ChatPage = () => {
 
     return (
         <div className="min-h-screen bg-slate-950/95 pt-28 text-slate-100">
-            <Container size="xl">
-                <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6 items-start">
+            <Container size="xl" className="mx-auto">
+                <div className="grid grid-cols-1 lg:grid-cols-[400px_minmax(864px,1fr)_400px] gap-6 items-start justify-center max-w-full">
                     {/* 왼쪽: 헤더 */}
                     <div className="lg:sticky lg:top-28">
                         <div className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40">
@@ -273,7 +275,7 @@ const ChatPage = () => {
                         </div>
                     </div>
 
-                    {/* 오른쪽: VOD 영상과 차트 */}
+                    {/* 가운데: VOD 영상과 차트 */}
                     <div className="min-w-0">
                         <Stack gap="xm">
                             {/* VOD 영상 */}
@@ -304,9 +306,18 @@ const ChatPage = () => {
                                     startTime={parsedStartTime}
                                     chatLogText={chatLogText}
                                     defaultTimeline={videoData.timeline}
+                                    searchKeyword={searchKeyword}
+                                    onSearchKeywordChange={setSearchKeyword}
                                 />
                             ) : null}
                         </Stack>
+                    </div>
+
+                    {/* 오른쪽: 주요 키워드 헤더 */}
+                    <div className="lg:sticky lg:top-28">
+                        <div className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40">
+                            <ChatKeywordRanking chatLogText={chatLogText} chatLogLoading={chatLogLoading} onKeywordClick={setSearchKeyword} />
+                        </div>
                     </div>
                 </div>
             </Container>

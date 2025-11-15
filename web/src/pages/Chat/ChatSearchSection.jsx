@@ -4,9 +4,16 @@ import ChatTimelineChart from './ChatTimelineChart.jsx';
 import { ChatTooltip } from './ChatTooltip.jsx';
 import { parseChatLog, filterMessagesByKeyword, createTimelineFromMessages } from './ChatLogParser.js';
 
-export const ChatSearchSection = ({ videoId, startTime, chatLogText, defaultTimeline }) => {
-    const [searchKeyword, setSearchKeyword] = useState('');
+export const ChatSearchSection = ({ videoId, startTime, chatLogText, defaultTimeline, searchKeyword: externalSearchKeyword, onSearchKeywordChange }) => {
+    const [searchKeyword, setSearchKeyword] = useState(externalSearchKeyword || '');
     const [samplingInterval, setSamplingInterval] = useState(10); // 분 단위, 기본값 10분
+
+    // 외부에서 전달된 검색어가 변경되면 내부 상태도 업데이트
+    useEffect(() => {
+        if (externalSearchKeyword !== undefined) {
+            setSearchKeyword(externalSearchKeyword);
+        }
+    }, [externalSearchKeyword]);
     const [filteredTimeline, setFilteredTimeline] = useState(null);
     const [loading, setLoading] = useState(false);
     const [chartWidth, setChartWidth] = useState(800);
@@ -151,7 +158,13 @@ export const ChatSearchSection = ({ videoId, startTime, chatLogText, defaultTime
                     <TextInput
                         placeholder="검색어를 입력하세요..."
                         value={searchKeyword}
-                        onChange={(e) => setSearchKeyword(e.target.value)}
+                        onChange={(e) => {
+                            const value = e.target.value;
+                            setSearchKeyword(value);
+                            if (onSearchKeywordChange) {
+                                onSearchKeywordChange(value);
+                            }
+                        }}
                         onKeyPress={handleKeyPress}
                         className="flex-1"
                         styles={{
