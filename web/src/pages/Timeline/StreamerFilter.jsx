@@ -25,6 +25,7 @@ export const CONTENT_FILTER_GROUPS = [
     { label: '봉누도', group: '스트리머 서버', category: 'Grand Theft Auto V', description: 'GTA5 기반 RP 서버', keywords: ['봉누도'], tags: [] },
     { label: '인챈트', group: '그룹', category: '', description: '', keywords: ['인챈트'], tags: ['인챈트'] },
     { label: '픽셀네트워크', group: '그룹', category: '', description: '', keywords: [], tags: ['픽셀네트워크'] },
+    { label: '카론 크리에이티브', group: '그룹', category: '', description: '', keywords: ['카론'], tags: ['카론'] },
     { label: '스텔라이브', group: '그룹', category: '', description: '', keywords: [], tags: ['스텔라이브'] },
     { label: '오버더월', group: '그룹', category: '', description: '', keywords: ['오버더월'], tags: ['오버더월'] },
     { label: '허니즈', group: '그룹', category: '', description: '', keywords: ['허니즈'], tags: ['허니즈'] },
@@ -35,6 +36,7 @@ export const CONTENT_FILTER_GROUPS = [
     { label: '메이비', group: '그룹', category: '', description: '', keywords: ['메이비'], tags: ['메이비'] },
     { label: '리액트kr', group: '그룹', category: '', description: '', keywords: ['리액트kr'], tags: ['리액트kr'] },
     { label: '프로젝트아이', group: '그룹', category: '', description: '', keywords: ['프로젝트아이'], tags: ['프로젝트아이'] },
+    { label: '에스더', group: '그룹', category: '', description: '', keywords: ['에스더'], tags: ['에스더'] },
 ];
 
 const NAV_OFFSET_REM = 6;
