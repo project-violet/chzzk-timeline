@@ -1,6 +1,6 @@
-use anyhow::{Context, Result};
+use color_eyre::eyre::{Context, Result};
 
-use crate::models::{
+use crate::api::models::{
     ChannelDetail, ChannelDetailResponse, Live, LiveDetail, LiveDetailResponse, LivesResponse,
     PageNext,
 };

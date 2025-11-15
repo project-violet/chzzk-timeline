@@ -1,12 +1,12 @@
 use std::env;
 
-use anyhow::Result;
+use color_eyre::eyre::Result;
 use futures::future::join_all;
 
-use crate::http::{fetch_channel, fetch_live_detail, fetch_lives_pages};
-use crate::models::LiveReady;
+use crate::api::client::{fetch_channel, fetch_live_detail, fetch_lives_pages};
+use crate::api::models::LiveReady;
 use crate::utils::{log, SCRAPING_CHANNELS};
-use crate::websocket::spawn_scrape_chats;
+use crate::api::websocket::spawn_scrape_chats;
 
 /// Node의 scanChannels와 대응
 pub async fn scan_channels() -> Result<()> {
@@ -77,3 +77,4 @@ pub async fn scan_channels() -> Result<()> {
 
     Ok(())
 }
+

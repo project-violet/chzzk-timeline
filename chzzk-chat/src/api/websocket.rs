@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use anyhow::Result;
+use color_eyre::eyre::Result;
 use futures::{SinkExt, StreamExt};
 use serde_json::Value;
 use tokio::time;
@@ -9,7 +9,7 @@ use tokio_tungstenite::{
     tungstenite::{client::IntoClientRequest, Message},
 };
 
-use crate::models::{InitBody, InitMessage, LiveReady};
+use crate::api::models::{InitBody, InitMessage, LiveReady};
 use crate::utils::{log, SCRAPING_CHANNELS};
 
 /// Node의 scrapeChats(live)와 대응 (백그라운드 태스크로 실행)
@@ -69,7 +69,7 @@ async fn scrape_chats(live: LiveReady) -> Result<()> {
         tokio::select! {
             _ = ping_interval.tick() => {
                 // Node 코드처럼 주기적으로 채널 상태 확인 및 PING
-                if let Some(detail) = crate::http::fetch_channel(&live.channel_id).await? {
+                if let Some(detail) = crate::api::client::fetch_channel(&live.channel_id).await? {
                     if let Some(open_live) = detail.open_live {
                         if !open_live {
                             log(format!("Channel {} closed live, closing websocket.", live.channel_id));
@@ -163,3 +163,4 @@ async fn handle_ws_message(
 
     Ok(())
 }
+

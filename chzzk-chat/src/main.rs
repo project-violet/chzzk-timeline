@@ -1,14 +1,11 @@
 use std::time::Duration;
 
-use anyhow::Result;
+use color_eyre::eyre::Result;
 use structopt::StructOpt;
 use tokio::time;
 
-mod http;
-mod models;
-mod scanner;
+mod api;
 mod utils;
-mod websocket;
 
 /// ====== CLI 구조체 ======
 
@@ -28,6 +25,7 @@ pub struct Opt {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    color_eyre::install()?;
     let opt = Opt::from_args();
 
     if opt.live_chat_test {
@@ -45,7 +43,7 @@ async fn main() -> Result<()> {
 /// 실시간 채팅 테스트 모드 실행
 async fn run_live_chat_test() -> Result<()> {
     utils::log("실시간 채팅 테스트 모드 시작");
-    scanner::scan_channels().await?;
+    api::scan_channels().await?;
 
     // 웹소켓 태스크들이 계속 돌 수 있도록 프로세스를 유지
     loop {
