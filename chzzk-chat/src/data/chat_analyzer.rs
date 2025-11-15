@@ -1,6 +1,15 @@
 use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::path::Path;
+use std::sync::Arc;
+
+use chrono::{Duration as ChronoDuration, Utc};
+use color_eyre::eyre::{Context, Result};
+use serde::Serialize;
 
 use crate::data::models::{ChannelWithReplays, ChatLog, Replay};
+use crate::utils;
+use rayon::prelude::*;
 
 /// 채팅 로그 분석 결과
 #[derive(Debug, Clone)]
@@ -214,7 +223,7 @@ pub fn filter_chat_logs_by_user_count(
 }
 
 /// 채널 간 연결 정보 (링크)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ChannelLink {
     pub source: String,
     pub target: String,
@@ -223,13 +232,24 @@ pub struct ChannelLink {
 }
 
 /// 채널 노드 정보
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ChannelNode {
+    #[serde(rename = "id")]
     pub channel_id: String,
     pub name: String,
     pub follower: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub image: Option<String>,
     pub chat_count: usize,
+}
+
+/// JSON 출력용 데이터 구조체
+#[derive(Debug, Serialize)]
+struct ChannelDistanceJson {
+    #[serde(rename = "updateTime")]
+    update_time: String,
+    nodes: Vec<ChannelNode>,
+    links: Vec<ChannelLink>,
 }
 
 /// 채널별 고유 사용자 집합을 구합니다.
@@ -306,44 +326,78 @@ pub fn calculate_channel_distances(
         channel_nodes.truncate(max);
     }
 
-    // 채널 쌍 생성 및 inter 계산
-    let mut links = Vec::new();
-    let channel_nodes_slice: Vec<_> = channel_nodes.iter().collect();
+    // 채널 쌍 생성 및 inter 계산 (병렬화)
+    // Arc로 감싸서 여러 스레드에서 안전하게 공유
+    let channel_nodes_arc = Arc::new(channel_nodes);
+    let channel_users_arc = Arc::new(channel_users);
+    let n = channel_nodes_arc.len();
 
-    for i in 0..channel_nodes_slice.len() {
-        for j in (i + 1)..channel_nodes_slice.len() {
-            let source_node = channel_nodes_slice[i];
-            let target_node = channel_nodes_slice[j];
+    // 모든 (i, j) 쌍을 생성 (i < j) - 병렬 처리
+    let mut links: Vec<ChannelLink> = (0..n)
+        .into_par_iter()
+        .flat_map(|i| {
+            let channel_nodes_ref = Arc::clone(&channel_nodes_arc);
+            let channel_users_ref = Arc::clone(&channel_users_arc);
 
-            // 두 채널의 고유 사용자 집합
-            let source_users = channel_users
+            let source_node = &channel_nodes_ref[i];
+            let source_users = channel_users_ref
                 .get(&source_node.channel_id)
                 .cloned()
                 .unwrap_or_default();
-            let target_users = channel_users
-                .get(&target_node.channel_id)
-                .cloned()
-                .unwrap_or_default();
+            let source_channel_id = source_node.channel_id.clone();
+            let source_chat_count = source_node.chat_count;
 
-            // 교집합 계산 (inter)
-            let inter = source_users.intersection(&target_users).count();
+            // 각 i에 대해 j > i인 모든 쌍을 생성
+            ((i + 1)..n)
+                .map(move |j| {
+                    let target_node = &channel_nodes_ref[j];
+                    let target_users = channel_users_ref
+                        .get(&target_node.channel_id)
+                        .cloned()
+                        .unwrap_or_default();
+                    let target_channel_id = target_node.channel_id.clone();
+                    let target_chat_count = target_node.chat_count;
 
-            // distance 계산: inter / MIN(source_cnt, target_cnt)
-            let min_count = source_node.chat_count.min(target_node.chat_count);
-            let distance = if min_count > 0 {
-                inter as f64 / min_count as f64
-            } else {
-                0.0
-            };
+                    // 교집합 계산 (inter)
+                    let inter = source_users.intersection(&target_users).count();
 
-            links.push(ChannelLink {
-                source: source_node.channel_id.clone(),
-                target: target_node.channel_id.clone(),
-                inter,
-                distance,
-            });
-        }
+                    // distance 계산: inter / MIN(source_cnt, target_cnt)
+                    let min_count = source_chat_count.min(target_chat_count);
+                    let distance = if min_count > 0 {
+                        inter as f64 / min_count as f64
+                    } else {
+                        0.0
+                    };
+
+                    ChannelLink {
+                        source: source_channel_id.clone(),
+                        target: target_channel_id,
+                        inter,
+                        distance,
+                    }
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect();
+
+    // channel_nodes를 Arc에서 다시 가져오기
+    let channel_nodes = Arc::try_unwrap(channel_nodes_arc).unwrap_or_else(|arc| (*arc).clone());
+
+    // 관련 없는 link 제거 (inter가 0이거나 distance가 0인 link 제거)
+    links.retain(|link| link.inter > 0 && link.distance > 0.0);
+
+    // links에 나타나는 channel_id 집합 생성
+    let mut linked_channel_ids: HashSet<String> = HashSet::new();
+    for link in &links {
+        linked_channel_ids.insert(link.source.clone());
+        linked_channel_ids.insert(link.target.clone());
     }
+
+    // link가 있는 노드만 남기기
+    let channel_nodes: Vec<ChannelNode> = channel_nodes
+        .into_iter()
+        .filter(|node| linked_channel_ids.contains(&node.channel_id))
+        .collect();
 
     // distance 기준으로 정렬
     links.sort_by(|a, b| {
@@ -353,6 +407,32 @@ pub fn calculate_channel_distances(
     });
 
     (channel_nodes, links)
+}
+
+/// 채널 간 distance와 inter 정보를 JSON 파일로 내보냅니다.
+pub fn export_channel_distances_json<P: AsRef<Path>>(
+    nodes: &[ChannelNode],
+    links: &[ChannelLink],
+    output_path: P,
+) -> Result<()> {
+    // KST 기준 현재 시간 생성 (updateTime 형식: "2025-11-09 17:27:55")
+    let now = Utc::now() + ChronoDuration::hours(9);
+    let update_time = now.format("%Y-%m-%d %H:%M:%S").to_string();
+
+    // JSON 구조체 생성 (직접 ChannelNode, ChannelLink 사용)
+    let json_data = ChannelDistanceJson {
+        update_time,
+        nodes: nodes.to_vec(),
+        links: links.to_vec(),
+    };
+
+    // JSON 파일로 저장
+    let json_string = serde_json::to_string_pretty(&json_data)
+        .context("Failed to serialize channel distances to JSON")?;
+    fs::write(&output_path, json_string)
+        .with_context(|| format!("Failed to write JSON file: {:?}", output_path.as_ref()))?;
+
+    Ok(())
 }
 
 /// 각 채널별로 가장 가까운 채널 상위 5개를 출력합니다.
@@ -396,7 +476,7 @@ pub fn print_top_closest_channels(nodes: &[ChannelNode], links: &[ChannelLink]) 
         });
 
         // 상위 5개 출력
-        let top_count = channel_links.len().min(5);
+        let top_count = channel_links.len().min(10);
         if top_count > 0 {
             for (i, (link, other_id, other_node)) in
                 channel_links.iter().take(top_count).enumerate()
@@ -515,29 +595,41 @@ pub struct ReplayCluster {
 
 /// 두 다시보기 간 유사도를 계산합니다 (시청자 수 기반).
 /// 반환값: 0.0 ~ 1.0 (1.0이 가장 유사, Jaccard 유사도)
+
 fn calculate_replay_similarity(
     a: &ReplayWithChannel,
     b: &ReplayWithChannel,
     video_viewers: &HashMap<u64, HashSet<String>>,
 ) -> f64 {
-    let viewers_a = video_viewers
-        .get(&a.replay.video_no)
-        .cloned()
-        .unwrap_or_default();
-    let viewers_b = video_viewers
-        .get(&b.replay.video_no)
-        .cloned()
-        .unwrap_or_default();
+    let viewers_a = match video_viewers.get(&a.replay.video_no) {
+        Some(v) => v,
+        None => return 0.0,
+    };
+    let viewers_b = match video_viewers.get(&b.replay.video_no) {
+        Some(v) => v,
+        None => return 0.0,
+    };
 
-    // Jaccard 유사도: intersection / union
-    let intersection = viewers_a.intersection(&viewers_b).count();
-    let union = viewers_a.union(&viewers_b).count();
-
-    if union > 0 {
-        intersection as f64 / union as f64
-    } else {
-        0.0
+    if viewers_a.is_empty() || viewers_b.is_empty() {
+        return 0.0;
     }
+
+    // 항상 작은 쪽을 돌면서 큰 쪽에 contains() → 캐시/성능 ↑
+    let (small, large) = if viewers_a.len() <= viewers_b.len() {
+        (viewers_a, viewers_b)
+    } else {
+        (viewers_b, viewers_a)
+    };
+
+    let intersection = small.iter().filter(|v| large.contains(*v)).count();
+    if intersection == 0 {
+        return 0.0;
+    }
+
+    // |A ∪ B| = |A| + |B| - |A ∩ B|
+    let union = viewers_a.len() + viewers_b.len() - intersection;
+
+    intersection as f64 / union as f64
 }
 
 /// 다시보기들을 유사도 기반으로 클러스터링합니다 (시청자 수 기준).
@@ -546,31 +638,36 @@ pub fn cluster_similar_replays(
     chat_logs: &[ChatLog],
     similarity_threshold: f64,
 ) -> Vec<ReplayCluster> {
-    // 모든 다시보기를 채널 정보와 함께 수집
-    let mut replays_with_channel: Vec<ReplayWithChannel> = Vec::new();
-    for channel in channels {
-        for replay in &channel.replays {
-            replays_with_channel.push(ReplayWithChannel {
-                replay: replay.clone(),
-                channel_id: channel.channel_id.clone(),
-                channel_name: channel.name.clone(),
-            });
-        }
-    }
-
-    if replays_with_channel.is_empty() {
-        return Vec::new();
-    }
-
-    // video_id별 시청자 집합 구하기
+    // video_id별 시청자 집합 구하기 (먼저 ChatLog가 있는 video_id 집합 생성)
     let mut video_viewers: HashMap<u64, HashSet<String>> = HashMap::new();
+    let mut video_ids_with_chat_log: HashSet<u64> = HashSet::new();
     for chat_log in chat_logs {
+        video_ids_with_chat_log.insert(chat_log.video_id);
         let viewers = video_viewers
             .entry(chat_log.video_id)
             .or_insert_with(HashSet::new);
         for message in &chat_log.messages {
             viewers.insert(message.user_id.clone());
         }
+    }
+
+    // ChatLog가 있는 다시보기만 채널 정보와 함께 수집
+    let mut replays_with_channel: Vec<ReplayWithChannel> = Vec::new();
+    for channel in channels {
+        for replay in &channel.replays {
+            // ChatLog가 있는 video_no만 포함
+            if video_ids_with_chat_log.contains(&replay.video_no) {
+                replays_with_channel.push(ReplayWithChannel {
+                    replay: replay.clone(),
+                    channel_id: channel.channel_id.clone(),
+                    channel_name: channel.name.clone(),
+                });
+            }
+        }
+    }
+
+    if replays_with_channel.is_empty() {
+        return Vec::new();
     }
 
     // Union-Find를 사용한 간단한 클러스터링
@@ -592,18 +689,51 @@ pub fn cluster_similar_replays(
         }
     }
 
-    // 유사도가 threshold 이상인 다시보기들을 같은 클러스터로 묶기
-    for i in 0..n {
-        for j in (i + 1)..n {
-            let similarity = calculate_replay_similarity(
-                &replays_with_channel[i],
-                &replays_with_channel[j],
-                &video_viewers,
-            );
-            if similarity >= similarity_threshold {
-                union(&mut parent, i, j);
-            }
-        }
+    // 유사도 계산을 병렬로 수행 (Arc로 공유)
+    let replays_arc = Arc::new(replays_with_channel);
+    let video_viewers_arc = Arc::new(video_viewers);
+
+    // Progress bar 생성
+    // 총 쌍 수: n * (n-1) / 2
+    let total_pairs = n * (n - 1) / 2;
+    let pb = utils::create_progress_bar(total_pairs as u64, "Calculating replay similarities...");
+
+    let pb = Arc::new(pb);
+
+    // 모든 (i, j) 쌍에 대해 유사도를 병렬로 계산하고, threshold를 넘는 쌍 수집
+    let pairs_to_union: Vec<(usize, usize)> = (0..n)
+        .into_par_iter()
+        .flat_map(|i| {
+            let replays_ref = Arc::clone(&replays_arc);
+            let video_viewers_ref = Arc::clone(&video_viewers_arc);
+            let pb = Arc::clone(&pb);
+
+            ((i + 1)..n)
+                .filter_map(move |j| {
+                    let similarity = calculate_replay_similarity(
+                        &replays_ref[i],
+                        &replays_ref[j],
+                        &video_viewers_ref,
+                    );
+
+                    pb.inc(1);
+
+                    if similarity >= similarity_threshold {
+                        Some((i, j))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect();
+
+    // Progress bar 완료
+    pb.finish_with_message("Replay similarities calculated!");
+
+    // 수집된 쌍들을 순차적으로 union 수행 (Union-Find는 순차적으로 실행되어야 함)
+    for (i, j) in pairs_to_union {
+        union(&mut parent, i, j);
     }
 
     // 클러스터별로 그룹화
@@ -612,6 +742,10 @@ pub fn cluster_similar_replays(
         let root = find(&mut parent, i);
         cluster_map.entry(root).or_insert_with(Vec::new).push(i);
     }
+
+    // replays_with_channel과 video_viewers를 Arc에서 다시 가져오기
+    let replays_with_channel = Arc::try_unwrap(replays_arc).unwrap_or_else(|arc| (*arc).clone());
+    let video_viewers = Arc::try_unwrap(video_viewers_arc).unwrap_or_else(|arc| (*arc).clone());
 
     // 클러스터 내 유사도 계산 및 정렬
     let mut clusters: Vec<ReplayCluster> = cluster_map

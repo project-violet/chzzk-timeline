@@ -1,11 +1,11 @@
 use color_eyre::eyre::{Context, Result};
-use indicatif::{ProgressBar, ProgressStyle};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::fs;
 use std::path::Path;
 
 use crate::data::models::{ChatLog, ChatMessage};
+use crate::utils;
 use chrono::{FixedOffset, TimeZone};
 use rayon::prelude::*;
 
@@ -107,14 +107,7 @@ pub fn load_all_chat_logs<P: AsRef<Path>>(chat_logs_dir: P) -> Result<Vec<ChatLo
     let total_files = log_file_paths.len();
 
     // Progress bar 생성
-    let pb = ProgressBar::new(total_files as u64);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos:>7}/{len:7} ({eta}) {msg}")
-            .unwrap()
-            .progress_chars("#>-"),
-    );
-    pb.set_message("Loading chat logs...");
+    let pb = utils::create_progress_bar(total_files as u64, "Loading chat logs...");
 
     // 병렬로 파일 로드
     // ProgressBar는 thread-safe하므로 Arc로 감싸지 않아도 됩니다.
