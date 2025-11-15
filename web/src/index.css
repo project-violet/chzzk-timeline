@@ -19,5 +19,5 @@
   /* VOD 페이지에 맞게 조정 */
   left: -240px;
   /* VOD 페이지에 맞게 조정 */
-  width: calc(125% + 300px);
+  width: calc(175%);
 }

@@ -13,7 +13,7 @@ const ChatTimelineChart = React.forwardRef(({ timeline, width, height, onHover, 
     const maxCount = Math.max(...timeline.map((d) => d.count));
     const minCount = 0; // Y축은 항상 0부터 시작
     const maxTime = Math.max(...timeline.map((d) => d.time));
-    const padding = { top: 40, right: 40, bottom: 60, left: 60 };
+    const padding = { top: 40, right: 0, bottom: 60, left: 30 };
     const chartWidth = width - padding.left - padding.right;
     const chartHeight = height - padding.top - padding.bottom;
 
@@ -303,17 +303,6 @@ const ChatTimelineChart = React.forwardRef(({ timeline, width, height, onHover, 
                 textAnchor="middle"
             >
                 시간
-            </text>
-            <text
-                x={20}
-                y={height / 2}
-                fill="rgb(148, 163, 184)"
-                fontSize="14"
-                fontWeight="600"
-                textAnchor="middle"
-                transform={`rotate(-90, 20, ${height / 2})`}
-            >
-                채팅 수
             </text>
         </svg>
     );

@@ -2,23 +2,23 @@ import { Badge, Button, Group, Text, Title } from '@mantine/core';
 
 export const VideoHeader = ({ videoInfo, videoData }) => {
     return (
-        <div className="flex gap-6 max-sm:flex-col">
+        <div className="flex flex-col gap-4">
             {videoInfo?.replay?.thumbnail ? (
                 <img
                     src={videoInfo.replay.thumbnail}
                     alt={videoInfo.replay.title ? `${videoInfo.replay.title} 썸네일` : '비디오 썸네일'}
-                    className="h-40 w-64 flex-none rounded-2xl border border-slate-800/60 object-cover shadow-inner shadow-slate-900/40 max-sm:h-40 max-sm:w-full"
+                    className="w-full rounded-2xl border border-slate-800/60 object-cover shadow-inner shadow-slate-900/40"
                     loading="lazy"
                 />
             ) : null}
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0">
                 {videoInfo?.channel?.name ? (
                     <Text size="sm" c="dimmed" fw={600} className="uppercase tracking-wide mb-2">
                         {videoInfo.channel.name}
                     </Text>
                 ) : null}
                 {videoInfo?.replay?.title ? (
-                    <Title order={1} size={32} fw={800} className="text-slate-100 mb-2">
+                    <Title order={1} size={24} fw={800} className="text-slate-100 mb-2 break-words">
                         {videoInfo.replay.title}
                     </Title>
                 ) : (
@@ -26,7 +26,7 @@ export const VideoHeader = ({ videoInfo, videoData }) => {
                         <Text size="xs" c="dimmed" fw={600} className="uppercase tracking-wide mb-2">
                             비디오 ID
                         </Text>
-                        <Title order={1} size={32} fw={800} className="text-slate-100">
+                        <Title order={1} size={24} fw={800} className="text-slate-100 break-words">
                             {videoData.videoId}
                         </Title>
                     </div>

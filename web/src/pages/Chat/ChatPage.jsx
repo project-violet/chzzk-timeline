@@ -220,80 +220,87 @@ const ChatPage = () => {
     return (
         <div className="min-h-screen bg-slate-950/95 pt-28 pb-20 text-slate-100">
             <Container size="xl">
-                <Stack gap="xl">
-                    {/* 헤더 */}
-                    <div className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40">
-                        <Stack gap="md">
-                            <VideoHeader videoInfo={videoInfo} videoData={videoData} />
-                            <VideoInfo parsedStartTime={parsedStartTime} endTime={endTime} totalDuration={totalDuration} />
-                            {/* <ChatStats stats={stats} /> */}
-                        </Stack>
+                <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6 items-start">
+                    {/* 왼쪽: 헤더 */}
+                    <div className="lg:sticky lg:top-28">
+                        <div className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40">
+                            <Stack gap="md">
+                                <VideoHeader videoInfo={videoInfo} videoData={videoData} />
+                                <VideoInfo parsedStartTime={parsedStartTime} endTime={endTime} totalDuration={totalDuration} />
+                                {/* <ChatStats stats={stats} /> */}
+                            </Stack>
+                        </div>
                     </div>
 
-                    {/* VOD 영상 */}
-                    {videoInfo?.replay?.videoNo ? (
-                        <div className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-8 shadow-lg shadow-slate-900/40">
-                            <Text size="lg" fw={700} mb={6} className="text-slate-100">
-                                영상 보기
-                            </Text>
-                            <div className="relative w-full vod-iframe-wrapper" style={{ paddingBottom: '56.25%' }}>
-                                <iframe
-                                    src={`https://chzzk.naver.com/video/${videoInfo.replay.videoNo}`}
-                                    className="absolute inset-0 w-full rounded-xl border border-slate-800/60"
-                                    frameBorder="0"
-                                    allowFullScreen
-                                    width="100%"
-                                    height="1000px"
-                                    allow="autoplay"
-                                    title={`${videoInfo.replay.title || '비디오'} 재생`}
-                                />
-                            </div>
-                        </div>
-                    ) : null}
+                    {/* 오른쪽: VOD 영상과 차트 */}
+                    <div className="min-w-0">
+                        <Stack gap="xl">
+                            {/* VOD 영상 */}
+                            {videoInfo?.replay?.videoNo ? (
+                                <div className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40">
+                                    <Text size="lg" fw={700} mb={6} className="text-slate-100">
+                                        영상 보기
+                                    </Text>
+                                    <div className="relative w-full vod-iframe-wrapper" style={{ paddingBottom: '56.25%' }}>
+                                        <iframe
+                                            src={`https://chzzk.naver.com/video/${videoInfo.replay.videoNo}`}
+                                            className="absolute inset-0 w-full rounded-xl border border-slate-800/60"
+                                            frameBorder="0"
+                                            allowFullScreen
+                                            width="100%"
+                                            height="1000px"
+                                            allow="autoplay"
+                                            title={`${videoInfo.replay.title || '비디오'} 재생`}
+                                        />
+                                    </div>
+                                </div>
+                            ) : null}
 
-                    {/* 차트 */}
-                    {videoData.timeline && videoData.timeline.length > 0 ? (
-                        <div
-                            ref={chartContainerRef}
-                            className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-8 shadow-lg shadow-slate-900/40"
-                        >
-                            <Text size="lg" fw={700} mb={6} className="text-slate-100">
-                                채팅 타임라인
-                            </Text>
-                            <Text size="sm" c="dimmed" mb={8}>
-                                시간별 채팅 수 변화
-                            </Text>
-                            <div className="w-full">
-                                <ChatTimelineChart
-                                    ref={chartSvgRef}
-                                    timeline={videoData.timeline}
-                                    width={chartWidth}
-                                    height={500}
-                                    startTime={parsedStartTime}
-                                    hoveredPoint={hoveredPoint}
-                                    onHover={(point) => {
-                                        setHoveredPoint(point);
-                                    }}
-                                    onPointScreenPosition={handlePointScreenPosition}
-                                    onMouseMove={(pos) => {
-                                        // 차트 위에서는 즉시 업데이트, tooltipPosition은 hoveredPoint 변경 시 업데이트됨
-                                    }}
-                                    onMouseLeave={() => {
-                                        setHoveredPoint(null);
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    ) : null}
+                            {/* 차트 */}
+                            {videoData.timeline && videoData.timeline.length > 0 ? (
+                                <div
+                                    ref={chartContainerRef}
+                                    className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40"
+                                >
+                                    <Text size="lg" fw={700} mb={6} className="text-slate-100">
+                                        채팅 타임라인
+                                    </Text>
+                                    <Text size="sm" c="dimmed" mb={8}>
+                                        시간별 채팅 수 변화
+                                    </Text>
+                                    <div className="w-full">
+                                        <ChatTimelineChart
+                                            ref={chartSvgRef}
+                                            timeline={videoData.timeline}
+                                            width={chartWidth}
+                                            height={350}
+                                            startTime={parsedStartTime}
+                                            hoveredPoint={hoveredPoint}
+                                            onHover={(point) => {
+                                                setHoveredPoint(point);
+                                            }}
+                                            onPointScreenPosition={handlePointScreenPosition}
+                                            onMouseMove={(pos) => {
+                                                // 차트 위에서는 즉시 업데이트, tooltipPosition은 hoveredPoint 변경 시 업데이트됨
+                                            }}
+                                            onMouseLeave={() => {
+                                                setHoveredPoint(null);
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            ) : null}
+                        </Stack>
+                    </div>
+                </div>
 
-                    {/* 툴팁 - 화면 전체에서 표시 */}
-                    <ChatTooltip
-                        hoveredPoint={hoveredPoint}
-                        tooltipPosition={tooltipPosition}
-                        isFirstRender={isFirstRender}
-                        parsedStartTime={parsedStartTime}
-                    />
-                </Stack>
+                {/* 툴팁 - 화면 전체에서 표시 */}
+                <ChatTooltip
+                    hoveredPoint={hoveredPoint}
+                    tooltipPosition={tooltipPosition}
+                    isFirstRender={isFirstRender}
+                    parsedStartTime={parsedStartTime}
+                />
             </Container>
         </div>
     );
