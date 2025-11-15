@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge, Button, Container, Group, MultiSelect, Stack, Text, TextInput, Title } from '@mantine/core';
-import { StreamerFilter } from './StreamerFilter.jsx';
+import { StreamerFilter, CONTENT_FILTER_GROUPS } from './StreamerFilter.jsx';
 import { TimelineTracks } from './TimelineTracks.jsx';
 
 const TIMELINE_BATCH = 20;
@@ -639,6 +639,8 @@ const TimelinePage = () => {
     const [replayTitleFilter, setReplayTitleFilter] = useState('');
     const [selectedCategories, setSelectedCategories] = useState([]);
     const [selectedTags, setSelectedTags] = useState([]);
+    const [activeFilterTab, setActiveFilterTab] = useState('streamer');
+    const [selectedContentGroups, setSelectedContentGroups] = useState([]);
 
     const filteredTimeline = useMemo(() => {
         if (selectedChannelIds.length === 0) {
@@ -712,10 +714,20 @@ const TimelinePage = () => {
         const requireCategory = categorySet.size > 0;
         const requireTags = tagList.length > 0;
 
+        // 컨텐츠 필터 그룹 처리
+        const requireContentFilter = selectedContentGroups.length > 0;
+        let contentFilterGroups = null;
+        if (requireContentFilter) {
+            contentFilterGroups = selectedContentGroups
+                .map((label) => CONTENT_FILTER_GROUPS.find((g) => g.label === label))
+                .filter(Boolean);
+        }
+
         if (
             replayKeywords.length === 0 &&
             !requireCategory &&
-            !requireTags
+            !requireTags &&
+            !requireContentFilter
         ) {
             return filteredTimeline;
         }
@@ -724,7 +736,39 @@ const TimelinePage = () => {
             .map((channel) => {
                 const matchingReplays = channel.replays.filter((replay) => {
                     const title = (replay?.title ?? '').toLowerCase();
-                    if (!replayKeywords.every((keyword) => title.includes(keyword))) return false;
+
+                    // 기존 제목 키워드 필터
+                    if (replayKeywords.length > 0 && !replayKeywords.every((keyword) => title.includes(keyword))) {
+                        return false;
+                    }
+
+                    // 컨텐츠 필터 그룹 처리
+                    if (requireContentFilter) {
+                        const matchesContentFilter = contentFilterGroups.some((group) => {
+                            // 키워드로 제목 확인
+                            if (group.keywords && group.keywords.length > 0) {
+                                const titleMatch = group.keywords.some((keyword) =>
+                                    title.includes(keyword.toLowerCase())
+                                );
+                                if (titleMatch) return true;
+                            }
+
+                            // 태그 확인
+                            if (group.tags && group.tags.length > 0) {
+                                if (Array.isArray(replay?.tags)) {
+                                    const normalizedTags = replay.tags
+                                        .map((tag) => (typeof tag === 'string' ? tag.trim() : ''))
+                                        .filter(Boolean);
+                                    const tagMatch = group.tags.some((tag) => normalizedTags.includes(tag));
+                                    if (tagMatch) return true;
+                                }
+                            }
+
+                            return false;
+                        });
+
+                        if (!matchesContentFilter) return false;
+                    }
 
                     if (requireCategory) {
                         const categoryValue = (replay?.categoryKo ?? '').trim();
@@ -744,7 +788,7 @@ const TimelinePage = () => {
                 return { ...channel, replays: matchingReplays };
             })
             .filter(Boolean);
-    }, [filteredTimeline, replayKeywords, selectedCategories, selectedTags]);
+    }, [filteredTimeline, replayKeywords, selectedCategories, selectedTags, selectedContentGroups]);
 
     const [visibleCount, setVisibleCount] = useState(TIMELINE_BATCH);
     const [isMobileViewport, setIsMobileViewport] = useState(() => {
@@ -767,7 +811,7 @@ const TimelinePage = () => {
 
     useEffect(() => {
         setVisibleCount(TIMELINE_BATCH);
-    }, [selectedChannelIds, replayKeywords, selectedCategories, selectedTags]);
+    }, [selectedChannelIds, replayKeywords, selectedCategories, selectedTags, selectedContentGroups]);
 
     const viewSpan = Math.max(viewRange.end - viewRange.start, MIN_VIEW_SPAN);
     const tickConfig = useMemo(() => getTickConfig(viewSpan, isMobileViewport), [viewSpan, isMobileViewport]);
@@ -862,6 +906,15 @@ const TimelinePage = () => {
         });
     };
 
+    const toggleContentGroup = (groupId) => {
+        setSelectedContentGroups((prev) => {
+            if (prev.includes(groupId)) {
+                return prev.filter((id) => id !== groupId);
+            }
+            return [...prev, groupId];
+        });
+    };
+
     return (
         <div className="min-h-screen bg-slate-950/95 pb-20 pt-28 text-slate-100">
             <Container size="100%">
@@ -872,6 +925,12 @@ const TimelinePage = () => {
                         onToggleChannel={toggleChannelSelection}
                         onResetSelection={() => setSelectedChannelIds([])}
                         selectedCount={selectedCount}
+                        activeTab={activeFilterTab}
+                        onTabChange={setActiveFilterTab}
+                        selectedContentGroups={selectedContentGroups}
+                        onToggleContentGroup={toggleContentGroup}
+                        onResetContentSelection={() => setSelectedContentGroups([])}
+                        contentSelectedCount={selectedContentGroups.length}
                     />
                     <Stack gap="sm">
                         <TimelinePageHeader
