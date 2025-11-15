@@ -4,7 +4,6 @@ import { Container, Stack, Text } from '@mantine/core';
 import ChatTimelineChart from './ChatTimelineChart.jsx';
 import { VideoHeader } from './VideoHeader.jsx';
 import { VideoInfo } from './VideoInfo.jsx';
-import { ChatStats } from './ChatStats.jsx';
 import { ChatTooltip } from './ChatTooltip.jsx';
 
 const ChatPage = () => {
@@ -223,11 +222,11 @@ const ChatPage = () => {
             <Container size="xl">
                 <Stack gap="xl">
                     {/* 헤더 */}
-                    <div className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-8 shadow-lg shadow-slate-900/40">
-                        <Stack gap="lg">
+                    <div className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40">
+                        <Stack gap="md">
                             <VideoHeader videoInfo={videoInfo} videoData={videoData} />
                             <VideoInfo parsedStartTime={parsedStartTime} endTime={endTime} totalDuration={totalDuration} />
-                            <ChatStats stats={stats} />
+                            {/* <ChatStats stats={stats} /> */}
                         </Stack>
                     </div>
 

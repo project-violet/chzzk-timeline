@@ -4,7 +4,7 @@ export const ChatStats = ({ stats }) => {
     if (!stats || stats.total === 0) return null;
 
     return (
-        <div className="mt-4 pt-6 border-t border-slate-800/60">
+        <div className="mt-3 pt-4 border-t border-slate-800/60">
             <Text size="sm" c="dimmed" fw={600} mb={4} className="uppercase tracking-wide">
                 채팅 통계
             </Text>

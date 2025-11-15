@@ -7,7 +7,7 @@ export const VideoHeader = ({ videoInfo, videoData }) => {
                 <img
                     src={videoInfo.replay.thumbnail}
                     alt={videoInfo.replay.title ? `${videoInfo.replay.title} 썸네일` : '비디오 썸네일'}
-                    className="h-64 w-96 flex-none rounded-2xl border border-slate-800/60 object-cover shadow-inner shadow-slate-900/40 max-sm:h-64 max-sm:w-full"
+                    className="h-40 w-64 flex-none rounded-2xl border border-slate-800/60 object-cover shadow-inner shadow-slate-900/40 max-sm:h-40 max-sm:w-full"
                     loading="lazy"
                 />
             ) : null}
@@ -18,7 +18,7 @@ export const VideoHeader = ({ videoInfo, videoData }) => {
                     </Text>
                 ) : null}
                 {videoInfo?.replay?.title ? (
-                    <Title order={1} size={42} fw={800} className="text-slate-100 mb-2">
+                    <Title order={1} size={32} fw={800} className="text-slate-100 mb-2">
                         {videoInfo.replay.title}
                     </Title>
                 ) : (
@@ -26,7 +26,7 @@ export const VideoHeader = ({ videoInfo, videoData }) => {
                         <Text size="xs" c="dimmed" fw={600} className="uppercase tracking-wide mb-2">
                             비디오 ID
                         </Text>
-                        <Title order={1} size={42} fw={800} className="text-slate-100">
+                        <Title order={1} size={32} fw={800} className="text-slate-100">
                             {videoData.videoId}
                         </Title>
                     </div>
