@@ -5,20 +5,29 @@ use structopt::StructOpt;
 use tokio::time;
 
 mod api;
+mod data;
 mod utils;
 
 /// ====== CLI 구조체 ======
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "chzzk-chat", about = "치지직 채팅 스크래퍼")]
-pub struct Opt {
+pub enum Opt {
     /// 실시간 채팅 테스트 모드 (채널 스캔 및 채팅 스크래핑)
-    #[structopt(long)]
-    pub live_chat_test: bool,
+    #[structopt(name = "live-chat-test")]
+    LiveChatTest,
 
     /// 채팅 분석 모드
-    #[structopt(long)]
-    pub analysis_chat: bool,
+    #[structopt(name = "analysis-chat")]
+    AnalysisChat(AnalysisChatOpt),
+}
+
+/// 채팅 분석 모드 옵션
+#[derive(StructOpt, Debug)]
+pub struct AnalysisChatOpt {
+    /// 채널 및 리플레이 데이터 파일 경로
+    #[structopt(long, default_value = "../web/public/channel_with_replays_0.json")]
+    pub file: String,
 }
 
 /// ====== 엔트리포인트 ======
@@ -28,13 +37,9 @@ async fn main() -> Result<()> {
     color_eyre::install()?;
     let opt = Opt::from_args();
 
-    if opt.live_chat_test {
-        run_live_chat_test().await?;
-    } else if opt.analysis_chat {
-        run_analysis_chat().await?;
-    } else {
-        // 기본값으로 live-chat-test 실행
-        run_live_chat_test().await?;
+    match opt {
+        Opt::LiveChatTest => run_live_chat_test().await?,
+        Opt::AnalysisChat(opts) => run_analysis_chat(&opts).await?,
     }
 
     Ok(())
@@ -52,9 +57,24 @@ async fn run_live_chat_test() -> Result<()> {
 }
 
 /// 채팅 분석 모드 실행
-async fn run_analysis_chat() -> Result<()> {
-    utils::log("채팅 분석 모드 시작");
-    // TODO: 채팅 분석 기능 구현
-    utils::log("채팅 분석 기능이 아직 구현되지 않았습니다.");
+async fn run_analysis_chat(opts: &AnalysisChatOpt) -> Result<()> {
+    utils::log(format!("채팅 분석 모드 시작: {}", opts.file));
+
+    // 채널 데이터 로드
+    let channels = data::loader::load_channel_with_replays(&opts.file)?;
+    utils::log(format!("로드된 채널 수: {}", channels.len()));
+
+    // chat_logs 폴더에서 모든 채팅 로그 로드
+    let chat_logs_dir = "../chat_logs";
+    utils::log(format!("채팅 로그 폴더에서 데이터 로드: {}", chat_logs_dir));
+    let chat_logs = data::chat_loader::load_all_chat_logs(chat_logs_dir)?;
+    utils::log(format!("로드된 채팅 로그 수: {}", chat_logs.len()));
+
+    // 각 채팅 로그 분석
+    for chat_log in &chat_logs {
+        let analysis = data::chat_analyzer::analyze_chat_log(chat_log);
+        data::chat_analyzer::print_analysis_summary(chat_log, &analysis);
+    }
+
     Ok(())
 }
