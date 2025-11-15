@@ -1,7 +1,8 @@
+import { Badge, Loader, Group, Text } from '@mantine/core';
 import { formatTime } from './utils.js';
 
-export const ChatTooltip = ({ hoveredPoint, tooltipPosition, isFirstRender, parsedStartTime }) => {
-    if (!hoveredPoint || !tooltipPosition) return null;
+export const ChatTooltip = ({ hoveredPoint, tooltipPosition, isFirstRender, parsedStartTime, keywords, keywordsLoading }) => {
+    if (!hoveredPoint || !tooltipPosition) { return null; }
 
     return (
         <div
@@ -48,6 +49,52 @@ export const ChatTooltip = ({ hoveredPoint, tooltipPosition, isFirstRender, pars
                             {hoveredPoint.count.toLocaleString('ko-KR')}개
                         </div>
                     </div>
+                    {keywordsLoading ? (
+                        <div className="mt-4 flex items-center gap-2">
+                            <Loader size="xs" color="teal" />
+                            <Text size="xs" c="dimmed">
+                                키워드 로딩 중...
+                            </Text>
+                        </div>
+                    ) : keywords && keywords.length > 0 ? (
+                        <div className="mt-4">
+                            <Text size="xs" c="dimmed" fw={600} className="uppercase tracking-wide mb-2">
+                                주요 키워드
+                            </Text>
+                            <div className="flex flex-col gap-2">
+                                {/* 첫 줄: 상위 3개 */}
+                                <div className="flex gap-2 flex-wrap">
+                                    {keywords.slice(0, 3).map((keyword, index) => (
+                                        <Badge
+                                            key={keyword.word}
+                                            size="sm"
+                                            radius="md"
+                                            variant="light"
+                                            color="teal"
+                                        >
+                                            {index + 1}. {keyword.word} ({keyword.count.toLocaleString('ko-KR')})
+                                        </Badge>
+                                    ))}
+                                </div>
+                                {/* 둘째 줄: 나머지 2개 */}
+                                {keywords.length > 3 && (
+                                    <div className="flex gap-2 flex-wrap">
+                                        {keywords.slice(3, 5).map((keyword, index) => (
+                                            <Badge
+                                                key={keyword.word}
+                                                size="sm"
+                                                radius="md"
+                                                variant="light"
+                                                color="cyan"
+                                            >
+                                                {index + 4}. {keyword.word} ({keyword.count.toLocaleString('ko-KR')})
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ) : null}
                 </div>
             </div>
         </div>

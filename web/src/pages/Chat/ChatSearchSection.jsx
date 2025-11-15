@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TextInput, Button, Text, Stack, NumberInput } from '@mantine/core';
 import ChatTimelineChart from './ChatTimelineChart.jsx';
 import { ChatTooltip } from './ChatTooltip.jsx';
-import { parseChatLog, filterMessagesByKeyword, createTimelineFromMessages } from './ChatLogParser.js';
+import { parseChatLog, filterMessagesByKeyword, createTimelineFromMessages, extractTopKeywords } from './ChatLogParser.js';
 
 export const ChatSearchSection = ({ videoId, startTime, chatLogText, defaultTimeline, searchKeyword: externalSearchKeyword, onSearchKeywordChange }) => {
     const [searchKeyword, setSearchKeyword] = useState(externalSearchKeyword || '');
@@ -22,6 +22,9 @@ export const ChatSearchSection = ({ videoId, startTime, chatLogText, defaultTime
     const [hoveredPoint, setHoveredPoint] = useState(null);
     const [tooltipPosition, setTooltipPosition] = useState(null);
     const [isFirstRender, setIsFirstRender] = useState(true);
+    const [hoveredKeywords, setHoveredKeywords] = useState(null);
+    const [keywordsLoading, setKeywordsLoading] = useState(false);
+    const keywordsCacheRef = useRef(new Map()); // 키워드 캐시
 
     // chat log 파싱
     const parsedMessages = useMemo(() => {
@@ -107,16 +110,14 @@ export const ChatSearchSection = ({ videoId, startTime, chatLogText, defaultTime
     }, [filteredTimeline]);
 
     // 툴팁 위치 업데이트
-    const handlePointScreenPosition = useMemo(() => {
-        return (pos) => {
-            if (pos && pos.x > 0 && pos.y > 0) {
-                setTooltipPosition(pos);
-                setIsFirstRender(false);
-            } else {
-                setTooltipPosition(null);
-                setIsFirstRender(true);
-            }
-        };
+    const handlePointScreenPosition = useCallback((pos) => {
+        if (pos && pos.x > 0 && pos.y > 0) {
+            setTooltipPosition(pos);
+            setIsFirstRender(false);
+        } else {
+            setTooltipPosition(null);
+            setIsFirstRender(true);
+        }
     }, []);
 
     const handleSearch = () => {
@@ -136,6 +137,61 @@ export const ChatSearchSection = ({ videoId, startTime, chatLogText, defaultTime
         if (!filteredTimeline || filteredTimeline.length === 0) return 0;
         return filteredTimeline.reduce((sum, item) => sum + (item.count || 0), 0);
     }, [filteredTimeline]);
+
+    // hoveredPoint 변경 시 해당 시간 범위의 키워드 추출 (캐싱 적용)
+    useEffect(() => {
+        if (!hoveredPoint || !startTime || !parsedMessages.length) {
+            setHoveredKeywords(null);
+            setKeywordsLoading(false);
+            return;
+        }
+
+        // 캐시 키 생성 (time, samplingInterval, searchKeyword 조합)
+        const cacheKey = `${hoveredPoint.time}_${samplingInterval}_${searchKeyword.trim()}`;
+
+        // 캐시 확인
+        const cachedKeywords = keywordsCacheRef.current.get(cacheKey);
+        if (cachedKeywords !== undefined) {
+            // 캐시에 있으면 즉시 표시 (로딩 없음)
+            setHoveredKeywords(cachedKeywords);
+            setKeywordsLoading(false);
+            return;
+        }
+
+        // 캐시에 없으면 로딩 시작
+        setKeywordsLoading(true);
+
+        // 비동기로 처리하여 UI 블로킹 방지
+        const timeoutId = setTimeout(() => {
+            // 해당 시간 범위의 메시지 필터링
+            const intervalSeconds = samplingInterval * 60;
+            const startTimestamp = startTime.getTime() + hoveredPoint.time * 1000;
+            const endTimestamp = startTimestamp + intervalSeconds * 1000;
+
+            const timeRangeMessages = parsedMessages.filter((msg) => {
+                return msg.timestamp >= startTimestamp && msg.timestamp < endTimestamp;
+            });
+
+            // 키워드 추출
+            const keywords = extractTopKeywords(timeRangeMessages, 5, 2);
+
+            // 캐시에 저장
+            keywordsCacheRef.current.set(cacheKey, keywords);
+
+            setHoveredKeywords(keywords);
+            setKeywordsLoading(false);
+        }, 0);
+
+        return () => {
+            clearTimeout(timeoutId);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hoveredPoint, startTime, samplingInterval, searchKeyword, chatLogText]);
+
+    // 검색어나 샘플링 간격이 변경되면 캐시 초기화
+    useEffect(() => {
+        keywordsCacheRef.current.clear();
+    }, [searchKeyword, samplingInterval]);
 
     return (
         <div className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40">
@@ -250,6 +306,8 @@ export const ChatSearchSection = ({ videoId, startTime, chatLogText, defaultTime
                 tooltipPosition={tooltipPosition}
                 isFirstRender={isFirstRender}
                 parsedStartTime={startTime}
+                keywords={hoveredKeywords}
+                keywordsLoading={keywordsLoading}
             />
         </div>
     );

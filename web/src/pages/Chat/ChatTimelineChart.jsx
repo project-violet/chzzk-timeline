@@ -69,10 +69,6 @@ const ChatTimelineChart = React.forwardRef(({ timeline, width, height, onHover, 
             if (onHover) {
                 onHover(closestPoint);
             }
-        } else {
-            if (onHover) {
-                onHover(null);
-            }
         }
     };
 
@@ -99,7 +95,8 @@ const ChatTimelineChart = React.forwardRef(({ timeline, width, height, onHover, 
         const screenY = svgRect.top + padding.top + hoveredPoint.y;
 
         onPointScreenPosition({ x: screenX, y: screenY });
-    }, [hoveredPoint, onPointScreenPosition, padding]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hoveredPoint, onPointScreenPosition]);
 
     // 차트 영역 그리기
     const pathData = points
