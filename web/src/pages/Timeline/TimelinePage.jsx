@@ -30,9 +30,9 @@ const parseDateInputValue = (value, endOfDay = false) => {
 
 const createDefaultDateRange = () => {
     const now = new Date();
-    const ninetyDaysAgo = new Date(now.getTime() - 30 * DAY_MS);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * DAY_MS);
     return {
-        start: toDateInputValue(ninetyDaysAgo),
+        start: toDateInputValue(sevenDaysAgo),
         end: toDateInputValue(now),
     };
 };
@@ -239,21 +239,21 @@ const TimelineFilterControls = ({
             <Group gap="xs" wrap="nowrap">
                 <Button
                     variant="subtle"
+                    color={activePreset === 7 ? 'teal' : 'gray'}
+                    radius="lg"
+                    size="xs"
+                    onClick={() => onPresetRangeSelect(7)}
+                >
+                    최근 일주일
+                </Button>
+                <Button
+                    variant="subtle"
                     color={activePreset === 30 ? 'teal' : 'gray'}
                     radius="lg"
                     size="xs"
                     onClick={() => onPresetRangeSelect(30)}
                 >
                     최근 한 달
-                </Button>
-                <Button
-                    variant="subtle"
-                    color={activePreset === 90 ? 'teal' : 'gray'}
-                    radius="lg"
-                    size="xs"
-                    onClick={() => onPresetRangeSelect(90)}
-                >
-                    최근 3개월
                 </Button>
                 <Button
                     variant="subtle"
@@ -468,7 +468,7 @@ const TimelinePage = () => {
     const defaultDateRangeRef = useRef(createDefaultDateRange());
     const [startDateFilter, setStartDateFilter] = useState(defaultDateRangeRef.current.start);
     const [endDateFilter, setEndDateFilter] = useState(defaultDateRangeRef.current.end);
-    const [activePreset, setActivePreset] = useState(30);
+    const [activePreset, setActivePreset] = useState(7);
 
     useEffect(() => {
         let aborted = false;
