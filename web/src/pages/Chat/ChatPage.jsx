@@ -6,6 +6,7 @@ import { VideoInfo } from './VideoInfo.jsx';
 import { ChatSearchSection } from './ChatSearchSection.jsx';
 import { ChatKeywordRanking } from './ChatKeywordRanking.jsx';
 import { RelatedVideos } from './RelatedVideos.jsx';
+import { RelatedChannels } from './RelatedChannels.jsx';
 
 const ChatPage = () => {
     const { videoId } = useParams();
@@ -274,6 +275,10 @@ const ChatPage = () => {
                                 {/* <ChatStats stats={stats} /> */}
                             </Stack>
                         </div>
+                        <div className="mt-6">
+                            <RelatedChannels currentChannelId={videoInfo?.channel?.channelId} />
+                        </div>
+
                     </div>
 
                     {/* 가운데: VOD 영상과 차트 */}

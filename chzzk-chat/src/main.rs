@@ -95,7 +95,7 @@ async fn run_analysis_chat(opts: &AnalysisChatOpt) -> Result<()> {
     //     data::chat_analyzer::print_analysis_summary(chat_log, &analysis, &channels);
     // }
 
-    // run_channel_distance_analysis(&channels, &chat_logs)?;
+    run_channel_distance_analysis(&channels, &chat_logs)?;
 
     // run_cluster_similar_replays(&channels, &chat_logs);
 
@@ -148,11 +148,23 @@ fn run_channel_distance_analysis(
 
     data::chat_analyzer::export_channel_distances_json(&nodes, &links, "../web/public/data2.json")?;
 
+    // 연관 채널 링크만 별도 JSON으로 내보내기 (각 채널당 최대 6개, distance ≥ 0.1)
+    data::chat_analyzer::export_related_channel_links_json(
+        &links,
+        "../web/public/related_channels.json",
+        0.01,
+        6,
+        &vec![
+            // 블랙리스트 채널들 (완전히 제외)
+            "c5f1df85d73d9c613f0c27c0ef816857".to_string(),
+        ],
+    )?;
+
     utils::log(format!("계산된 채널 노드 수: {}", nodes.len()));
     utils::log(format!("계산된 채널 링크 수: {}", links.len()));
 
     // 채널별로 가장 가까운 채널 상위 5개 출력
-    data::chat_analyzer::print_top_closest_channels(&nodes, &links);
+    // data::chat_analyzer::print_top_closest_channels(&nodes, &links);
 
     Ok(())
 }

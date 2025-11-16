@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Avatar, Badge, Group, Text } from '@mantine/core';
+import React, { useMemo } from 'react';
 
 const MIN_SEGMENT_WIDTH_PERCENT = 0.6;
 const STICKY_FADE_DISTANCE = 160;
@@ -188,92 +189,252 @@ const TimelineAxisHeader = ({
     );
 };
 
-const ChannelSidebar = ({ channelRows, rowHeight, isMobile }) => (
-    <div className="relative overflow-hidden rounded-2xl border border-slate-800/70 bg-slate-900/60">
-        <div className="pointer-events-none absolute inset-0">
-            {channelRows.slice(1).map((_, dividerIndex) => (
-                <div
-                    key={`sidebar-divider-${dividerIndex}`}
-                    className="absolute left-4 right-4 border-t border-slate-800/35"
-                    style={{ top: (dividerIndex + 1) * rowHeight }}
-                />
-            ))}
-        </div>
-        {channelRows.map(({ channel }) => {
-            const key = channel.channelId ?? channel.name;
-            const channelUrl = channel?.channelId ? `https://chzzk.naver.com/${channel.channelId}` : null;
+const ChannelSidebar = ({ channelRows, rowHeight, isMobile }) => {
+    const [hovered, setHovered] = useState({ channelId: null, rowIndex: null });
+    const [relatedMap, setRelatedMap] = useState(null);
+    const [channelsMeta, setChannelsMeta] = useState([]);
 
-            const content = (
-                <div
-                    className={isMobile ? 'flex h-full flex-col items-center justify-center px-1 text-center' : 'px-4'}
-                    style={{ height: rowHeight }}
-                >
-                    {isMobile ? (
-                        <div className="flex flex-col items-center gap-2">
-                            <Avatar
-                                src={`${channel.image}?type=f120_120_na`}
-                                radius="xl"
-                                size={42}
-                                alt={channel.name}
-                                className="shadow-md ring-1 ring-slate-800/60"
-                            >
-                                {getInitials(channel.name)}
-                            </Avatar>
-                            <Text size="xs" fw={600} className="max-w-[100px] truncate text-[10.5px] leading-tight">
-                                {channel.name}
-                            </Text>
-                        </div>
-                    ) : (
-                        <Group gap="sm" wrap="nowrap" style={{ height: '100%' }}>
-                            <Avatar
-                                src={`${channel.image}?type=f120_120_na`}
-                                radius="xl"
-                                size={60}
-                                alt={channel.name}
-                                className="shadow-md ring-1 ring-slate-800/60"
-                            >
-                                {getInitials(channel.name)}
-                            </Avatar>
-                            <div className="min-w-0">
-                                <Text size="sm" fw={600} className="truncate">
+    useEffect(() => {
+        let aborted = false;
+        async function load() {
+            try {
+                // related 파일 우선/폴백
+                const tryUrls = ['/related_channels.json', '/@related_channels.json'];
+                let related = null;
+                for (const url of tryUrls) {
+                    try {
+                        const r = await fetch(url);
+                        if (r.ok) {
+                            related = await r.json();
+                            break;
+                        }
+                    } catch {
+                        // ignore
+                    }
+                }
+                const [res0, res1] = await Promise.all([
+                    fetch('/channel_with_replays_0.json'),
+                    fetch('/channel_with_replays_1.json'),
+                ]);
+                const a0 = res0.ok ? await res0.json() : [];
+                const a1 = res1.ok ? await res1.json() : [];
+                if (!aborted) {
+                    setRelatedMap(related);
+                    setChannelsMeta([...(Array.isArray(a0) ? a0 : []), ...(Array.isArray(a1) ? a1 : [])]);
+                }
+            } catch {
+                if (!aborted) {
+                    setRelatedMap(null);
+                }
+            }
+        }
+        load();
+        return () => {
+            aborted = true;
+        };
+    }, []);
+
+    const idToChannel = useMemo(() => {
+        const map = new Map();
+        for (const ch of channelsMeta) {
+            if (ch?.channelId) map.set(ch.channelId, ch);
+        }
+        return map;
+    }, [channelsMeta]);
+
+    const relatedItems = useMemo(() => {
+        if (!hovered.channelId || !relatedMap) return [];
+        const list = relatedMap[hovered.channelId];
+        if (!Array.isArray(list)) return [];
+        return list
+            .map((item) => {
+                const ch = idToChannel.get(item.target);
+                return ch
+                    ? {
+                        id: item.target,
+                        name: ch.name ?? '',
+                        image: ch.image,
+                        similarity: typeof item.distance === 'number' ? item.distance : 0,
+                    }
+                    : null;
+            })
+            .filter(Boolean)
+            .slice(0, 6);
+    }, [hovered.channelId, idToChannel, relatedMap]);
+
+    return (
+        <div className="relative overflow-visible rounded-2xl border border-slate-800/70 bg-slate-900/60">
+            <div className="pointer-events-none absolute inset-0">
+                {channelRows.slice(1).map((_, dividerIndex) => (
+                    <div
+                        key={`sidebar-divider-${dividerIndex}`}
+                        className="absolute left-4 right-4 border-t border-slate-800/35"
+                        style={{ top: (dividerIndex + 1) * rowHeight }}
+                    />
+                ))}
+            </div>
+            {channelRows.map(({ channel }, rowIndex) => {
+                const key = channel.channelId ?? channel.name;
+                const channelUrl = channel?.channelId ? `https://chzzk.naver.com/${channel.channelId}` : null;
+
+                const content = (
+                    <div
+                        className={isMobile ? 'flex h-full flex-col items-center justify-center px-1 text-center' : 'px-4'}
+                        style={{ height: rowHeight }}
+                        onMouseEnter={() => setHovered({ channelId: channel.channelId, rowIndex })}
+                        onMouseLeave={() => setHovered({ channelId: null, rowIndex: null })}
+                    >
+                        {isMobile ? (
+                            <div className="flex flex-col items-center gap-2">
+                                <Avatar
+                                    src={`${channel.image}?type=f120_120_na`}
+                                    radius="xl"
+                                    size={42}
+                                    alt={channel.name}
+                                    className="shadow-md ring-1 ring-slate-800/60"
+                                >
+                                    {getInitials(channel.name)}
+                                </Avatar>
+                                <Text size="xs" fw={600} className="max-w-[100px] truncate text-[10.5px] leading-tight">
                                     {channel.name}
                                 </Text>
-                                <Group gap={6} mt={4} wrap="wrap">
-                                    <Badge size="sm" radius="lg" variant="light" color="teal">
-                                        팔로워 {Number(channel.follower ?? 0).toLocaleString('ko-KR')}
-                                    </Badge>
-                                    <Badge size="sm" radius="lg" variant="light" color="blue">
-                                        리플레이 {channel.replays.length.toLocaleString('ko-KR')}개
-                                    </Badge>
-                                </Group>
                             </div>
-                        </Group>
-                    )}
-                </div>
-            );
-
-            if (channelUrl) {
-                return (
-                    <a
-                        key={key}
-                        href={channelUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block no-underline text-inherit transition hover:bg-slate-800/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-400/70"
-                    >
-                        {content}
-                    </a>
+                        ) : (
+                            <Group gap="sm" wrap="nowrap" style={{ height: '100%' }}>
+                                <Avatar
+                                    src={`${channel.image}?type=f120_120_na`}
+                                    radius="xl"
+                                    size={60}
+                                    alt={channel.name}
+                                    className="shadow-md ring-1 ring-slate-800/60"
+                                >
+                                    {getInitials(channel.name)}
+                                </Avatar>
+                                <div className="min-w-0">
+                                    <Text size="sm" fw={600} className="truncate">
+                                        {channel.name}
+                                    </Text>
+                                    <Group gap={6} mt={4} wrap="wrap">
+                                        <Badge size="sm" radius="lg" variant="light" color="teal">
+                                            팔로워 {Number(channel.follower ?? 0).toLocaleString('ko-KR')}
+                                        </Badge>
+                                        <Badge size="sm" radius="lg" variant="light" color="blue">
+                                            리플레이 {channel.replays.length.toLocaleString('ko-KR')}개
+                                        </Badge>
+                                    </Group>
+                                </div>
+                            </Group>
+                        )}
+                    </div>
                 );
-            }
 
-            return (
-                <div key={key} className="block">
-                    {content}
+                if (channelUrl) {
+                    return (
+                        <a
+                            key={key}
+                            href={channelUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block no-underline text-inherit transition hover:bg-slate-800/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-400/70"
+                        >
+                            {content}
+                        </a>
+                    );
+                }
+
+                return (
+                    <div key={key} className="block">
+                        {content}
+                    </div>
+                );
+            })}
+
+            {/* 오른편 연관 채널 툴팁 */}
+            {hovered.channelId && relatedItems.length > 0 ? (
+                <div
+                    className="absolute z-[70]"
+                    style={{
+                        top: hovered.rowIndex * rowHeight,
+                        left: '50%',
+                        transform: 'translate(-50%, -12px) translateY(-100%)',
+                    }}
+                >
+                    {/* 말풍선 테일(외곽선) */}
+                    <div
+                        className="pointer-events-none absolute left-1/2 translate-x-[-50%]"
+                        style={{
+                            bottom: -9,
+                            width: 0,
+                            height: 0,
+                            borderLeft: '10px solid transparent',
+                            borderRight: '10px solid transparent',
+                            borderTop: '10px solid rgba(30,41,59,0.7)', // slate-800/70
+                            filter: 'drop-shadow(0 2px 6px rgba(2,6,23,0.6))',
+                            zIndex: 2,
+                        }}
+                        aria-hidden="true"
+                    />
+                    {/* 말풍선 테일(채움) */}
+                    <div
+                        className="pointer-events-none absolute left-1/2 translate-x-[-50%]"
+                        style={{
+                            bottom: -8,
+                            width: 0,
+                            height: 0,
+                            borderLeft: '9px solid transparent',
+                            borderRight: '9px solid transparent',
+                            borderTop: '9px solid rgba(15,23,42,0.95)', // slate-900/95
+                            zIndex: 3,
+                        }}
+                        aria-hidden="true"
+                    />
+                    <div
+                        className="overflow-hidden rounded-2xl border border-slate-800/70 bg-slate-900/95 p-3 shadow-lg shadow-slate-900/40"
+                        style={{ width: 420 }}
+                        role="tooltip"
+                        aria-live="polite"
+                        aria-label="연관 채널"
+                    >
+                        <div
+                            style={{
+                                position: 'relative',
+                                zIndex: 1,
+                            }}
+                        >
+                            <div className="grid grid-cols-3 gap-3">
+                                {relatedItems.map((item) => (
+                                    <a
+                                        key={item.id}
+                                        href={`https://chzzk.naver.com/${item.id}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex flex-col items-center rounded-xl p-2 transition-colors hover:bg-slate-800/40"
+                                        aria-label={`${item.name} 채널로 이동`}
+                                    >
+                                        <Avatar
+                                            src={item.image ? `${item.image}?type=f120_120_na` : undefined}
+                                            alt={item.name}
+                                            radius="xl"
+                                            size={48}
+                                        >
+                                            {item.name.slice(0, 2)}
+                                        </Avatar>
+                                        <Text size="xs" fw={600} className="mt-1 w-full truncate text-center" title={item.name}>
+                                            {item.name}
+                                        </Text>
+                                        <Badge size="xs" variant="light" color="teal">
+                                            연관도 {(item.similarity * 100).toFixed(0)}%
+                                        </Badge>
+                                    </a>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            );
-        })}
-    </div>
-);
+            ) : null}
+        </div>
+    );
+};
 
 const TimelineCanvas = ({
     channelRows,

@@ -449,6 +449,84 @@ pub fn export_channel_distances_json<P: AsRef<Path>>(
     Ok(())
 }
 
+/// 채널별 연관 채널 링크만 JSON으로 내보냅니다.
+/// 각 채널에 대해 distance ≥ min_distance 인 상위 max_per_channel 개만 포함합니다.
+pub fn export_related_channel_links_json<P: AsRef<Path>>(
+    links: &[ChannelLink],
+    output_path: P,
+    min_distance: f64,
+    max_per_channel: usize,
+    blacklist: &[String],
+) -> Result<()> {
+    use std::collections::{HashMap, HashSet};
+
+    // 블랙리스트 set
+    let blacklist_set: HashSet<&str> = blacklist.iter().map(|s| s.as_str()).collect();
+
+    // 양방향 인접 리스트 구성: source->target, target->source 모두 포함
+    let mut adj: HashMap<String, Vec<(String, usize, f64)>> = HashMap::new();
+    for link in links {
+        if link.distance >= min_distance {
+            // 블랙리스트 채널은 완전히 제외
+            if blacklist_set.contains(link.source.as_str())
+                || blacklist_set.contains(link.target.as_str())
+            {
+                continue;
+            }
+            adj.entry(link.source.clone()).or_default().push((
+                link.target.clone(),
+                link.inter,
+                link.distance,
+            ));
+            adj.entry(link.target.clone()).or_default().push((
+                link.source.clone(),
+                link.inter,
+                link.distance,
+            ));
+        }
+    }
+
+    // 각 채널별로 distance 내림차순 정렬 후 상위 max_per_channel만 선택
+    #[derive(Serialize)]
+    struct RelatedItem {
+        target: String,
+        inter: usize,
+        distance: f64,
+    }
+
+    let mut json_map: HashMap<String, Vec<RelatedItem>> = HashMap::new();
+    for (channel_id, mut neighbors) in adj {
+        // 방어적으로 채널 키 자체도 블랙리스트면 스킵
+        if blacklist_set.contains(channel_id.as_str()) {
+            continue;
+        }
+        neighbors.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
+        let top: Vec<RelatedItem> = neighbors
+            .into_iter()
+            .take(max_per_channel)
+            .map(|(target, inter, distance)| RelatedItem {
+                target,
+                inter,
+                distance,
+            })
+            .collect();
+        if !top.is_empty() {
+            json_map.insert(channel_id, top);
+        }
+    }
+
+    let json_string = serde_json::to_string_pretty(&json_map)
+        .context("Failed to serialize related channel links to JSON")?;
+    fs::write(&output_path, json_string).with_context(|| {
+        format!(
+            "Failed to write related channel links JSON file: {:?}",
+            output_path.as_ref()
+        )
+    })?;
+
+    Ok(())
+}
+
 /// 각 채널별로 가장 가까운 채널 상위 5개를 출력합니다.
 pub fn print_top_closest_channels(nodes: &[ChannelNode], links: &[ChannelLink]) {
     // 채널 ID로 노드 정보 찾기 위한 맵 생성
