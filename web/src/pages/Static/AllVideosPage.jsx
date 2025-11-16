@@ -229,6 +229,8 @@ const AllVideosPage = () => {
                                         <Link
                                             to={item.inAppChatUrl}
                                             className="inline-flex items-center rounded-full border border-slate-700/70 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800/70"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
                                             title="채팅 타임라인"
                                         >
                                             채팅 타임라인
