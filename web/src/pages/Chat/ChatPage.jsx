@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Container, Stack, Text } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { VideoHeader } from './VideoHeader.jsx';
 import { VideoInfo } from './VideoInfo.jsx';
 import { ChatSearchSection } from './ChatSearchSection.jsx';
@@ -24,6 +25,7 @@ const ChatPage = () => {
     const [chatLogLoading, setChatLogLoading] = useState(false);
     const [chatLogError, setChatLogError] = useState(null);
     const [searchKeyword, setSearchKeyword] = useState('');
+    const isMobile = useMediaQuery('(max-width: 1024px)');
 
     useEffect(() => {
         let aborted = false;
@@ -278,7 +280,6 @@ const ChatPage = () => {
                         <div className="mt-6">
                             <RelatedChannels currentChannelId={videoInfo?.channel?.channelId} />
                         </div>
-
                     </div>
 
                     {/* 가운데: VOD 영상과 차트 */}
@@ -317,17 +318,29 @@ const ChatPage = () => {
                                 />
                             ) : null}
 
-                            {/* 유사한 영상 */}
-                            <RelatedVideos videoId={videoId} />
+                            {/* 모바일: 키워드 -> 유사한 영상 순서 */}
+                            {isMobile ? (
+                                <>
+                                    <div className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40">
+                                        <ChatKeywordRanking chatLogText={chatLogText} chatLogLoading={chatLogLoading} onKeywordClick={setSearchKeyword} />
+                                    </div>
+                                    <RelatedVideos videoId={videoId} />
+                                </>
+                            ) : (
+                                /* PC: 유사한 영상만 */
+                                <RelatedVideos videoId={videoId} />
+                            )}
                         </Stack>
                     </div>
 
-                    {/* 오른쪽: 주요 키워드 헤더 */}
-                    <div className="lg:sticky lg:top-28">
-                        <div className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40">
-                            <ChatKeywordRanking chatLogText={chatLogText} chatLogLoading={chatLogLoading} onKeywordClick={setSearchKeyword} />
+                    {/* 오른쪽: 주요 키워드 헤더 (PC만) */}
+                    {!isMobile && (
+                        <div className="lg:sticky lg:top-28">
+                            <div className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40">
+                                <ChatKeywordRanking chatLogText={chatLogText} chatLogLoading={chatLogLoading} onKeywordClick={setSearchKeyword} />
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </Container>
         </div>

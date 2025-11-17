@@ -16,7 +16,6 @@ export const ChatSearchSection = ({ videoId, startTime, chatLogText, defaultTime
     }, [externalSearchKeyword]);
     const [filteredTimeline, setFilteredTimeline] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [chartWidth, setChartWidth] = useState(800);
     const chartContainerRef = useRef(null);
     const chartSvgRef = useRef(null);
     const [hoveredPoint, setHoveredPoint] = useState(null);
@@ -25,6 +24,7 @@ export const ChatSearchSection = ({ videoId, startTime, chatLogText, defaultTime
     const [hoveredKeywords, setHoveredKeywords] = useState(null);
     const [keywordsLoading, setKeywordsLoading] = useState(false);
     const keywordsCacheRef = useRef(new Map()); // 키워드 캐시
+    const [containerWidth, setContainerWidth] = useState(null);
 
     // chat log 파싱
     const parsedMessages = useMemo(() => {
@@ -79,35 +79,28 @@ export const ChatSearchSection = ({ videoId, startTime, chatLogText, defaultTime
         }
     }, [filteredMessages, startTime, searchKeyword, defaultTimeline, parsedMessages, samplingInterval]);
 
-    // 차트 너비 계산
+    // 컨테이너 너비 계산 (차트가 표시될 때만)
     useEffect(() => {
-        if (typeof window === 'undefined' || !chartContainerRef.current) return;
+        if (!chartContainerRef.current || (filteredTimeline === null && (!searchKeyword.trim() || !startTime))) {
+            return;
+        }
 
-        const updateChartWidth = () => {
+        const updateWidth = () => {
             const container = chartContainerRef.current;
             if (!container) return;
-
-            const containerRect = container.getBoundingClientRect();
-            const padding = 48; // p-6 = 1.5rem = 24px * 2
-            const availableWidth = containerRect.width - padding;
-
-            setChartWidth(Math.max(400, availableWidth));
+            const rect = container.getBoundingClientRect();
+            setContainerWidth(rect.width);
         };
 
-        updateChartWidth();
+        updateWidth();
 
-        const resizeObserver = new ResizeObserver(() => {
-            updateChartWidth();
-        });
-
+        const resizeObserver = new ResizeObserver(updateWidth);
         resizeObserver.observe(chartContainerRef.current);
-        window.addEventListener('resize', updateChartWidth);
 
         return () => {
             resizeObserver.disconnect();
-            window.removeEventListener('resize', updateChartWidth);
         };
-    }, [filteredTimeline]);
+    }, [filteredTimeline, searchKeyword, startTime]);
 
     // 툴팁 위치 업데이트
     const handlePointScreenPosition = useCallback((pos) => {
@@ -119,10 +112,6 @@ export const ChatSearchSection = ({ videoId, startTime, chatLogText, defaultTime
             setIsFirstRender(true);
         }
     }, []);
-
-    const handleSearch = () => {
-        // 검색어 변경 시 filteredMessages가 자동으로 업데이트됨
-    };
 
     const handleKeyPress = (e) => {
         if (e.key === 'Enter') {
@@ -259,15 +248,6 @@ export const ChatSearchSection = ({ videoId, startTime, chatLogText, defaultTime
                             분
                         </Text>
                     </div>
-                    <Button
-                        onClick={handleSearch}
-                        variant="light"
-                        color="teal"
-                        radius="lg"
-                        size="md"
-                    >
-                        검색
-                    </Button>
                 </div>
 
                 {loading ? (
@@ -278,24 +258,26 @@ export const ChatSearchSection = ({ videoId, startTime, chatLogText, defaultTime
                     </div>
                 ) : (filteredTimeline !== null || (searchKeyword.trim() && startTime)) ? (
                     <div ref={chartContainerRef} className="w-full">
-                        <ChatTimelineChart
-                            ref={chartSvgRef}
-                            timeline={filteredTimeline || []}
-                            width={chartWidth}
-                            height={350}
-                            startTime={startTime}
-                            hoveredPoint={hoveredPoint}
-                            onHover={(point) => {
-                                setHoveredPoint(point);
-                            }}
-                            onPointScreenPosition={handlePointScreenPosition}
-                            onMouseMove={(pos) => {
-                                // 차트 위에서는 즉시 업데이트, tooltipPosition은 hoveredPoint 변경 시 업데이트됨
-                            }}
-                            onMouseLeave={() => {
-                                setHoveredPoint(null);
-                            }}
-                        />
+                        {containerWidth && (
+                            <ChatTimelineChart
+                                ref={chartSvgRef}
+                                timeline={filteredTimeline || []}
+                                width={containerWidth}
+                                height={350}
+                                startTime={startTime}
+                                hoveredPoint={hoveredPoint}
+                                onHover={(point) => {
+                                    setHoveredPoint(point);
+                                }}
+                                onPointScreenPosition={handlePointScreenPosition}
+                                onMouseMove={(pos) => {
+                                    // 차트 위에서는 즉시 업데이트, tooltipPosition은 hoveredPoint 변경 시 업데이트됨
+                                }}
+                                onMouseLeave={() => {
+                                    setHoveredPoint(null);
+                                }}
+                            />
+                        )}
                     </div>
                 ) : null}
             </Stack>

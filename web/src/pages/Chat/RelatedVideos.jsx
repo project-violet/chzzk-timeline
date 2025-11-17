@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Text, Stack, Group, Badge } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
+import { useMediaQuery } from '@mantine/hooks';
 import { formatDateRange, formatDuration } from './utils.js';
 
 export const RelatedVideos = ({ videoId }) => {
     const [relatedVideos, setRelatedVideos] = useState([]);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
+    const isMobile = useMediaQuery('(max-width: 768px)');
 
     useEffect(() => {
         if (!videoId) {
@@ -94,14 +96,14 @@ export const RelatedVideos = ({ videoId }) => {
                 {relatedVideos.map((video) => (
                     <div
                         key={video.video_no}
-                        className="flex items-start gap-6 p-4 rounded-xl border border-slate-800/50 bg-slate-800/30 cursor-pointer hover:bg-slate-800/50 transition-colors"
+                        className={`flex ${isMobile ? 'flex-col' : 'items-start'} gap-6 p-4 rounded-xl border border-slate-800/50 bg-slate-800/30 cursor-pointer hover:bg-slate-800/50 transition-colors`}
                         onClick={() => navigate(`/chat/${video.video_no}`)}
                     >
                         {video.thumbnail ? (
                             <img
                                 src={video.thumbnail}
                                 alt={video.title ? `${video.title} 썸네일` : '비디오 썸네일'}
-                                className="h-52 w-80 flex-shrink-0 rounded-2xl border border-slate-800/60 object-cover shadow-inner shadow-slate-900/40"
+                                className={`${isMobile ? 'w-full' : 'h-52 w-80'} flex-shrink-0 rounded-2xl border border-slate-800/60 object-cover shadow-inner shadow-slate-900/40`}
                                 loading="lazy"
                             />
                         ) : null}
