@@ -5,6 +5,7 @@ import TimelinePage from './pages/Timeline/TimelinePage.jsx';
 import ChatPage from './pages/Chat/ChatPage.jsx';
 import AllVideosPage from './pages/Static/AllVideosPage.jsx';
 import ChannelPage from './pages/Channel/ChannelPage.jsx';
+import WorldPage from './pages/World/WorldPage.jsx';
 
 const MapPinIcon = (props) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true" {...props}>
@@ -48,6 +49,7 @@ const StreamerIcon = (props) => (
 );
 
 const navItems = [
+  { to: '/world', label: '스트리머 월드', Icon: MapPinIcon },
   { to: '/map', label: '치지직 맵', Icon: MapPinIcon },
   { to: '/timeline', label: '치지직 타임라인', Icon: ClockIcon },
 ];
@@ -184,6 +186,7 @@ const App = () => {
         <Routes>
           <Route path="/" element={<Navigate to="/timeline" replace />} />
           <Route path="/map" element={<MapPage />} />
+          <Route path="/world" element={<WorldPage />} />
           <Route path="/timeline" element={<TimelinePage />} />
           <Route path="/chat/:videoId" element={<ChatPage />} />
           <Route path="/channel/:channelId" element={<ChannelPage />} />
