@@ -189,54 +189,12 @@ const TimelineAxisHeader = ({
     );
 };
 
-const ChannelSidebar = ({ channelRows, rowHeight, isMobile }) => {
+const ChannelSidebar = ({ channelRows, rowHeight, isMobile, relatedMap, channelsMeta }) => {
     const [hovered, setHovered] = useState({ channelId: null, rowIndex: null });
-    const [relatedMap, setRelatedMap] = useState(null);
-    const [channelsMeta, setChannelsMeta] = useState([]);
-
-    useEffect(() => {
-        let aborted = false;
-        async function load() {
-            try {
-                // related 파일 우선/폴백
-                const tryUrls = ['/related_channels.json', '/@related_channels.json'];
-                let related = null;
-                for (const url of tryUrls) {
-                    try {
-                        const r = await fetch(url);
-                        if (r.ok) {
-                            related = await r.json();
-                            break;
-                        }
-                    } catch {
-                        // ignore
-                    }
-                }
-                const [res0, res1] = await Promise.all([
-                    fetch('/channel_with_replays_0.json'),
-                    fetch('/channel_with_replays_1.json'),
-                ]);
-                const a0 = res0.ok ? await res0.json() : [];
-                const a1 = res1.ok ? await res1.json() : [];
-                if (!aborted) {
-                    setRelatedMap(related);
-                    setChannelsMeta([...(Array.isArray(a0) ? a0 : []), ...(Array.isArray(a1) ? a1 : [])]);
-                }
-            } catch {
-                if (!aborted) {
-                    setRelatedMap(null);
-                }
-            }
-        }
-        load();
-        return () => {
-            aborted = true;
-        };
-    }, []);
 
     const idToChannel = useMemo(() => {
         const map = new Map();
-        for (const ch of channelsMeta) {
+        for (const ch of channelsMeta || []) {
             if (ch?.channelId) map.set(ch.channelId, ch);
         }
         return map;
@@ -681,6 +639,10 @@ export function TimelineTracks({
     onViewRangeChange,
     onResetView,
     videoWithChatCounts,
+    showAxisHeader = true,
+    forceSidebarMobile = false,
+    relatedMap,
+    channelsMeta = [],
 }) {
     const axisRef = useRef(null);
     const surfaceRef = useRef(null);
@@ -1194,24 +1156,32 @@ export function TimelineTracks({
             onPointerLeave={() => setHoverPosition(null)}
             onDoubleClick={handleResetView}
         >
-            <TimelineAxisHeader
-                axisRef={axisRef}
-                selectionBox={selectionBox}
-                axisTicks={axisTicks}
-                viewRange={activeRange}
-                viewSpan={activeViewSpan}
-                clamp={clamp}
-                isMobile={isMobile}
-                handleTouchEnd={handleTouchEnd}
-                showHoverGuide={showHoverGuide}
-                onToggleHoverGuide={setShowHoverGuide}
-            />
+            {showAxisHeader && (
+                <TimelineAxisHeader
+                    axisRef={axisRef}
+                    selectionBox={selectionBox}
+                    axisTicks={axisTicks}
+                    viewRange={activeRange}
+                    viewSpan={activeViewSpan}
+                    clamp={clamp}
+                    isMobile={isMobile}
+                    handleTouchEnd={handleTouchEnd}
+                    showHoverGuide={showHoverGuide}
+                    onToggleHoverGuide={setShowHoverGuide}
+                />
+            )}
 
             <div
-                className={`grid items-start gap-2 ${isMobile ? 'grid-cols-[92px_minmax(0,1fr)]' : 'grid-cols-[220px_minmax(0,1fr)]'
+                className={`grid items-start gap-2 ${forceSidebarMobile || isMobile ? 'grid-cols-[92px_minmax(0,1fr)]' : 'grid-cols-[220px_minmax(0,1fr)]'
                     }`}
             >
-                <ChannelSidebar channelRows={channelRows} rowHeight={rowHeight} isMobile={isMobile} />
+                <ChannelSidebar
+                    channelRows={channelRows}
+                    rowHeight={rowHeight}
+                    isMobile={forceSidebarMobile || isMobile}
+                    relatedMap={relatedMap}
+                    channelsMeta={channelsMeta}
+                />
                 <TimelineCanvas
                     channelRows={channelRows}
                     rowHeight={rowHeight}
@@ -1258,5 +1228,7 @@ TimelineTracks.propTypes = {
     onViewRangeChange: PropTypes.func.isRequired,
     onResetView: PropTypes.func.isRequired,
     videoWithChatCounts: PropTypes.instanceOf(Set),
+    showAxisHeader: PropTypes.bool,
+    forceAxisHeaderMobile: PropTypes.bool,
 };
 

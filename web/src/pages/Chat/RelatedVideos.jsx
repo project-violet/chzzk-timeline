@@ -1,89 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Text, Stack, Group, Badge } from '@mantine/core';
 import { useNavigate } from 'react-router-dom';
 import { useMediaQuery } from '@mantine/hooks';
 import { formatDateRange, formatDuration } from './utils.js';
 
-export const RelatedVideos = ({ videoId }) => {
-    const [relatedVideos, setRelatedVideos] = useState([]);
-    const [loading, setLoading] = useState(true);
+export const RelatedVideos = ({ videos = [] }) => {
     const navigate = useNavigate();
     const isMobile = useMediaQuery('(max-width: 768px)');
 
-    useEffect(() => {
-        if (!videoId) {
-            setLoading(false);
-            return;
-        }
+    const relatedVideos = useMemo(() => {
+        if (!Array.isArray(videos)) return [];
+        return videos.filter(Boolean);
+    }, [videos]);
 
-        const loadRelatedVideos = async () => {
-            try {
-                setLoading(true);
-                const [relatedResponse, ...channelResponses] = await Promise.all([
-                    fetch('/video_related.json'),
-                    fetch('/channel_with_replays_0.json'),
-                    fetch('/channel_with_replays_1.json'),
-                ]);
-
-                if (!relatedResponse.ok) {
-                    throw new Error('Failed to load related videos');
-                }
-
-                const relatedData = await relatedResponse.json();
-                const videos = relatedData[videoId] || [];
-
-                // 썸네일 정보 가져오기
-                try {
-                    const channelDataArrays = await Promise.all(
-                        channelResponses.map(async (res) => {
-                            if (!res.ok) return [];
-                            const data = await res.json();
-                            return Array.isArray(data) ? data : [];
-                        })
-                    );
-                    const allChannels = channelDataArrays.flat();
-
-                    // 각 비디오에 썸네일 및 상세 정보 추가
-                    const videosWithDetails = videos.map((video) => {
-                        for (const channel of allChannels) {
-                            if (Array.isArray(channel?.replays)) {
-                                const replay = channel.replays.find(
-                                    (r) => String(r.videoNo) === String(video.video_no)
-                                );
-                                if (replay) {
-                                    return {
-                                        ...video,
-                                        thumbnail: replay.thumbnailUrl || replay.thumbnail,
-                                        replay,
-                                        channel,
-                                    };
-                                }
-                            }
-                        }
-                        return video;
-                    });
-
-                    setRelatedVideos(videosWithDetails);
-                } catch (err) {
-                    console.warn('Failed to load thumbnails:', err);
-                    setRelatedVideos(videos);
-                }
-            } catch (err) {
-                console.error('Failed to load related videos:', err);
-                setRelatedVideos([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadRelatedVideos();
-    }, [videoId]);
-
-    if (loading) {
-        return null;
-    }
-
-    if (!relatedVideos || relatedVideos.length === 0) {
+    if (!relatedVideos.length) {
         return null;
     }
 
@@ -99,14 +29,21 @@ export const RelatedVideos = ({ videoId }) => {
                         className={`flex ${isMobile ? 'flex-col' : 'items-start'} gap-6 p-4 rounded-xl border border-slate-800/50 bg-slate-800/30 cursor-pointer hover:bg-slate-800/50 transition-colors`}
                         onClick={() => navigate(`/chat/${video.video_no}`)}
                     >
-                        {video.thumbnail ? (
-                            <img
-                                src={video.thumbnail}
-                                alt={video.title ? `${video.title} 썸네일` : '비디오 썸네일'}
-                                className={`${isMobile ? 'w-full' : 'h-52 w-80'} flex-shrink-0 rounded-2xl border border-slate-800/60 object-cover shadow-inner shadow-slate-900/40`}
-                                loading="lazy"
-                            />
-                        ) : null}
+                        {(() => {
+                            const thumbnailSrc =
+                                video.thumbnail ||
+                                video.replay?.thumbnailUrl ||
+                                video.replay?.thumbnail;
+                            if (!thumbnailSrc) return null;
+                            return (
+                                <img
+                                    src={thumbnailSrc}
+                                    alt={video.title ? `${video.title} 썸네일` : '비디오 썸네일'}
+                                    className={`${isMobile ? 'w-full' : 'h-52 w-80'} flex-shrink-0 rounded-2xl border border-slate-800/60 object-cover shadow-inner shadow-slate-900/40`}
+                                    loading="lazy"
+                                />
+                            );
+                        })()}
                         <div className="flex-1 min-w-0 space-y-2">
                             <Text size="sm" c="dimmed" fw={600} className="uppercase tracking-wide">
                                 {video.channel?.name || video.channel_name}

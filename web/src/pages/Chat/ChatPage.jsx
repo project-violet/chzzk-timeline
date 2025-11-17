@@ -8,6 +8,7 @@ import { ChatSearchSection } from './ChatSearchSection.jsx';
 import { ChatKeywordRanking } from './ChatKeywordRanking.jsx';
 import { RelatedVideos } from './RelatedVideos.jsx';
 import { RelatedChannels } from './RelatedChannels.jsx';
+import { RelatedTimelineSection } from './RelatedTimelineSection.jsx';
 
 const ChatPage = () => {
     const { videoId } = useParams();
@@ -26,6 +27,9 @@ const ChatPage = () => {
     const [chatLogError, setChatLogError] = useState(null);
     const [searchKeyword, setSearchKeyword] = useState('');
     const isMobile = useMediaQuery('(max-width: 1024px)');
+    const [videoWithChatCounts, setVideoWithChatCounts] = useState(null);
+    const [allChannels, setAllChannels] = useState([]);
+    const [relatedVideosData, setRelatedVideosData] = useState([]);
 
     useEffect(() => {
         let aborted = false;
@@ -49,6 +53,11 @@ const ChatPage = () => {
                 const chatData = await chatResponse.json();
                 const videos = Array.isArray(chatData?.videos) ? chatData.videos : [];
                 const video = videos.find((v) => String(v.videoId) === String(videoId));
+                const chatCountSet = new Set(videos.map((v) => String(v.videoId)).filter(Boolean));
+
+                if (!aborted) {
+                    setVideoWithChatCounts(chatCountSet);
+                }
 
                 if (!video) {
                     if (!aborted) {
@@ -69,6 +78,9 @@ const ChatPage = () => {
                         })
                     );
                     const allChannels = channelDataArrays.flat();
+                    if (!aborted) {
+                        setAllChannels(allChannels);
+                    }
 
                     // 모든 채널의 리플레이에서 videoId로 매칭
                     for (const channel of allChannels) {
@@ -231,6 +243,74 @@ const ChatPage = () => {
         return { total, max, min, avg };
     }, [videoData]);
 
+    const relatedVideosForCards = useMemo(() => {
+        if (!Array.isArray(relatedVideosData) || relatedVideosData.length === 0) return [];
+        const currentId = videoInfo?.replay?.videoNo ?? videoId;
+        return relatedVideosData.filter((video) => {
+            const replayId = video?.replay?.videoNo ?? video?.video_no;
+            return String(replayId) !== String(currentId);
+        });
+    }, [relatedVideosData, videoInfo, videoId]);
+
+    // 연관 비디오 데이터 로드 (공용)
+    useEffect(() => {
+        if (!videoId) {
+            setRelatedVideosData([]);
+            return;
+        }
+
+        let aborted = false;
+
+        async function loadRelatedVideos() {
+            try {
+                const relatedResponse = await fetch('/video_related.json');
+                if (!relatedResponse.ok) {
+                    throw new Error('Failed to load related videos');
+                }
+
+                const relatedData = await relatedResponse.json();
+                const videos = relatedData[videoId] || [];
+
+                const enriched = videos
+                    .map((video) => {
+                        const channel = allChannels.find((ch) => {
+                            if (!Array.isArray(ch?.replays)) return false;
+                            return ch.replays.some((r) => String(r.videoNo) === String(video.video_no));
+                        });
+                        if (!channel) return null;
+
+                        const replay =
+                            channel.replays.find((r) => String(r.videoNo) === String(video.video_no)) ?? null;
+                        if (!replay) return null;
+
+                        return {
+                            ...video,
+                            replay,
+                            channel,
+                        };
+                    })
+                    .filter(Boolean);
+
+                if (!aborted) {
+                    setRelatedVideosData(enriched);
+                }
+            } catch (err) {
+                console.error('Failed to load related videos:', err);
+                if (!aborted) {
+                    setRelatedVideosData([]);
+                }
+            }
+        }
+
+        if (allChannels.length > 0) {
+            loadRelatedVideos();
+        }
+
+        return () => {
+            aborted = true;
+        };
+    }, [videoId, allChannels]);
+
     if (loading) {
         return (
             <div className="min-h-screen bg-slate-950/95 pt-28 text-slate-100">
@@ -324,11 +404,29 @@ const ChatPage = () => {
                                     <div className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40">
                                         <ChatKeywordRanking chatLogText={chatLogText} chatLogLoading={chatLogLoading} onKeywordClick={setSearchKeyword} />
                                     </div>
-                                    <RelatedVideos videoId={videoId} />
+
+                                    <RelatedTimelineSection
+                                        videoId={videoId}
+                                        videoInfo={videoInfo}
+                                        isMobile={isMobile}
+                                        relatedVideosData={relatedVideosData}
+                                        videoWithChatCounts={videoWithChatCounts}
+                                    />
+
+                                    <RelatedVideos videos={relatedVideosForCards} />
                                 </>
                             ) : (
                                 /* PC: 유사한 영상만 */
-                                <RelatedVideos videoId={videoId} />
+                                <>
+                                    <RelatedTimelineSection
+                                        videoId={videoId}
+                                        videoInfo={videoInfo}
+                                        isMobile={isMobile}
+                                        relatedVideosData={relatedVideosData}
+                                        videoWithChatCounts={videoWithChatCounts}
+                                    />
+                                    <RelatedVideos videos={relatedVideosForCards} />
+                                </>
                             )}
                         </Stack>
                     </div>
@@ -342,8 +440,8 @@ const ChatPage = () => {
                         </div>
                     )}
                 </div>
-            </Container>
-        </div>
+            </Container >
+        </div >
     );
 };
 
