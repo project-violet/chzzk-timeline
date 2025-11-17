@@ -1230,5 +1230,13 @@ TimelineTracks.propTypes = {
     videoWithChatCounts: PropTypes.instanceOf(Set),
     showAxisHeader: PropTypes.bool,
     forceAxisHeaderMobile: PropTypes.bool,
+    relatedMap: PropTypes.object,
+    channelsMeta: PropTypes.arrayOf(
+        PropTypes.shape({
+            channelId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+            name: PropTypes.string,
+            image: PropTypes.string,
+        })
+    ),
 };
 

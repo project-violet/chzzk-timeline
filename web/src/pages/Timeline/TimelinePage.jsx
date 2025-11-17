@@ -465,6 +465,7 @@ const TimelinePage = () => {
     const [rawTimeline, setRawTimeline] = useState([]);
     const [loadError, setLoadError] = useState(null);
     const [videoWithChatCounts, setVideoWithChatCounts] = useState(new Set());
+    const [relatedMap, setRelatedMap] = useState(null);
     const defaultDateRangeRef = useRef(createDefaultDateRange());
     const [startDateFilter, setStartDateFilter] = useState(defaultDateRangeRef.current.start);
     const [endDateFilter, setEndDateFilter] = useState(defaultDateRangeRef.current.end);
@@ -543,6 +544,39 @@ const TimelinePage = () => {
         };
     }, []);
 
+    // related_channels.json 로드
+    useEffect(() => {
+        let aborted = false;
+
+        async function loadRelatedMap() {
+            const candidateUrls = ['/related_channels.json', '/@related_channels.json'];
+
+            for (const url of candidateUrls) {
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) continue;
+                    const data = await response.json();
+                    if (!aborted) {
+                        setRelatedMap(data && typeof data === 'object' ? data : null);
+                    }
+                    return;
+                } catch (error) {
+                    console.warn(`related_channels 데이터를 불러오는 중 오류 (${url}):`, error);
+                }
+            }
+
+            if (!aborted) {
+                setRelatedMap(null);
+            }
+        }
+
+        loadRelatedMap();
+
+        return () => {
+            aborted = true;
+        };
+    }, []);
+
     const timelineData = useMemo(() => {
         const parsed = Array.isArray(rawTimeline) ? rawTimeline : [];
         const startFilter = parseDateInputValue(startDateFilter, false);
@@ -585,6 +619,20 @@ const TimelinePage = () => {
             .filter((channel) => channel.replays.length > 0)
             .sort((a, b) => (b?.follower ?? 0) - (a?.follower ?? 0));
     }, [rawTimeline, startDateFilter, endDateFilter]);
+
+    const channelsMeta = useMemo(() => {
+        if (!Array.isArray(rawTimeline)) return [];
+        return rawTimeline
+            .map((channel) => {
+                if (!channel?.channelId) return null;
+                return {
+                    channelId: channel.channelId,
+                    name: channel.name ?? '',
+                    image: channel.image,
+                };
+            })
+            .filter(Boolean);
+    }, [rawTimeline]);
 
     const bounds = useMemo(() => {
         let min = Number.POSITIVE_INFINITY;
@@ -1031,6 +1079,8 @@ const TimelinePage = () => {
                             onViewRangeChange={setViewRange}
                             onResetView={resetView}
                             videoWithChatCounts={videoWithChatCounts}
+                            relatedMap={relatedMap}
+                            channelsMeta={channelsMeta}
                         />
 
                         {canLoadMore ? (
