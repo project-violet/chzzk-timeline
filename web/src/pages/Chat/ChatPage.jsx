@@ -398,7 +398,7 @@ const ChatPage = () => {
                                 />
                             ) : null}
 
-                            {/* 모바일: 키워드 -> 유사한 영상 순서 */}
+                            {/* 모바일: 키워드 -> 연관 영상 순서 */}
                             {isMobile ? (
                                 <>
                                     <div className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40">
@@ -416,7 +416,6 @@ const ChatPage = () => {
                                     <RelatedVideos videos={relatedVideosForCards} />
                                 </>
                             ) : (
-                                /* PC: 유사한 영상만 */
                                 <>
                                     <RelatedTimelineSection
                                         videoId={videoId}

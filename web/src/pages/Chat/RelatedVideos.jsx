@@ -20,7 +20,7 @@ export const RelatedVideos = ({ videos = [] }) => {
     return (
         <div className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40">
             <Text size="lg" fw={700} mb={6} className="text-slate-100">
-                유사한 영상
+                연관 영상
             </Text>
             <Stack gap={8}>
                 {relatedVideos.map((video) => (
