@@ -3,7 +3,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
-use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone};
+use chrono::{DateTime, Duration, FixedOffset, NaiveDateTime, TimeZone};
 use color_eyre::eyre::{Context, Result};
 use rayon::prelude::*;
 use serde::Serialize;
@@ -79,9 +79,14 @@ fn is_time_range_overlapping(
     candidate_start: DateTime<FixedOffset>,
     candidate_end: DateTime<FixedOffset>,
 ) -> bool {
+    let buffer = Duration::minutes(10);
+
+    let target_start_buffered = target_start - buffer;
+    let target_end_buffered = target_end + buffer;
+
     // 두 범위가 겹치려면:
     // target_start < candidate_end && candidate_start < target_end
-    target_start < candidate_end && candidate_start < target_end
+    target_start_buffered < candidate_end && candidate_start < target_end_buffered
 }
 
 /// 비디오별 채팅 유저 집합을 구합니다.
