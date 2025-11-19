@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { formatTime, formatTimeShort } from './utils.js';
 
-const ChatTimelineChart = React.forwardRef(({ timeline, width, height, onHover, onMouseMove, onMouseLeave, hoveredPoint, onPointScreenPosition, startTime }, ref) => {
+const ChatTimelineChart = React.forwardRef(({ timeline, width, height, onHover, onMouseMove, onMouseLeave, hoveredPoint, onPointScreenPosition, startTime, onPointDoubleClick }, ref) => {
     const svgRef = useRef(null);
     const [mouseX, setMouseX] = useState(0);
+    const [closestPoint, setClosestPoint] = useState(null);
 
     // ref 전달
     React.useImperativeHandle(ref, () => svgRef.current);
@@ -68,6 +69,7 @@ const ChatTimelineChart = React.forwardRef(({ timeline, width, height, onHover, 
         if (closestPoint && minDistance < chartWidth / (points.length * 2)) {
             if (onHover) {
                 onHover(closestPoint);
+                setClosestPoint(closestPoint);
             }
         }
     };
@@ -79,6 +81,15 @@ const ChatTimelineChart = React.forwardRef(({ timeline, width, height, onHover, 
         }
         if (onMouseLeave) {
             onMouseLeave();
+        }
+    };
+
+    const handleDoubleClick = (event) => {
+        if (!onPointDoubleClick) {
+            return;
+        }
+        if (closestPoint) {
+            onPointDoubleClick(closestPoint);
         }
     };
 
@@ -147,6 +158,7 @@ const ChatTimelineChart = React.forwardRef(({ timeline, width, height, onHover, 
             className="overflow-visible cursor-crosshair"
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
+            onDoubleClick={handleDoubleClick}
         >
             <defs>
                 <linearGradient id="chatGradient" x1="0%" y1="0%" x2="0%" y2="100%">

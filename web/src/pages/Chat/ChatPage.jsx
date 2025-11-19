@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Container, Stack, Text } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
@@ -30,6 +30,7 @@ const ChatPage = () => {
     const [videoWithChatCounts, setVideoWithChatCounts] = useState(null);
     const [allChannels, setAllChannels] = useState([]);
     const [relatedVideosData, setRelatedVideosData] = useState([]);
+    const [iframeCurrentTime, setIframeCurrentTime] = useState(null);
 
     useEffect(() => {
         let aborted = false;
@@ -122,6 +123,17 @@ const ChatPage = () => {
             aborted = true;
         };
     }, [videoId]);
+
+    useEffect(() => {
+        setIframeCurrentTime(null);
+    }, [videoId]);
+    const handleTimelinePointDoubleClick = useCallback((point) => {
+        if (!point || typeof point.time !== 'number') {
+            return;
+        }
+        const safeTime = Math.max(0, Math.round(point.time));
+        setIframeCurrentTime(safeTime);
+    }, []);
 
     // Chat log 다운로드
     useEffect(() => {
@@ -373,7 +385,7 @@ const ChatPage = () => {
                                     </Text>
                                     <div className="relative w-full vod-iframe-wrapper" style={{ paddingBottom: '56.25%' }}>
                                         <iframe
-                                            src={`https://chzzk.naver.com/video/${videoInfo.replay.videoNo}`}
+                                            src={`https://chzzk.naver.com/video/${videoInfo.replay.videoNo}${iframeCurrentTime !== null ? `?currentTime=${iframeCurrentTime}` : ''}`}
                                             className="absolute inset-0 w-full rounded-xl border border-slate-800/60"
                                             frameBorder="0"
                                             allowFullScreen
@@ -395,6 +407,7 @@ const ChatPage = () => {
                                     defaultTimeline={videoData.timeline}
                                     searchKeyword={searchKeyword}
                                     onSearchKeywordChange={setSearchKeyword}
+                                    onTimelinePointDoubleClick={handleTimelinePointDoubleClick}
                                 />
                             ) : null}
 

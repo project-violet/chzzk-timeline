@@ -4,7 +4,7 @@ import ChatTimelineChart from './ChatTimelineChart.jsx';
 import { ChatTooltip } from './ChatTooltip.jsx';
 import { parseChatLog, filterMessagesByKeyword, createTimelineFromMessages, extractTopKeywords } from './ChatLogParser.js';
 
-export const ChatSearchSection = ({ videoId, startTime, chatLogText, defaultTimeline, searchKeyword: externalSearchKeyword, onSearchKeywordChange }) => {
+export const ChatSearchSection = ({ videoId, startTime, chatLogText, defaultTimeline, searchKeyword: externalSearchKeyword, onSearchKeywordChange, onTimelinePointDoubleClick }) => {
     const [searchKeyword, setSearchKeyword] = useState(externalSearchKeyword || '');
     const [samplingInterval, setSamplingInterval] = useState(10); // 분 단위, 기본값 10분
 
@@ -276,6 +276,7 @@ export const ChatSearchSection = ({ videoId, startTime, chatLogText, defaultTime
                                 onMouseLeave={() => {
                                     setHoveredPoint(null);
                                 }}
+                                onPointDoubleClick={onTimelinePointDoubleClick}
                             />
                         )}
                     </div>
