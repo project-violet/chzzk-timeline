@@ -4,6 +4,8 @@ forked from https://github.com/stupidJoon/chzzk-map
 
 url: https://chzzk-timeline.pages.dev/
 
+discord: https://discord.gg/Q4y4Rq9n
+
 ![](image1.png)
 
 ![](image3.png)
