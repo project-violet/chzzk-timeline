@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { hangulToKeystrokes, levenshteinDistance } from '../../utils/hangul';
 
 const AllVideosPage = () => {
     const [videos, setVideos] = useState([]);
@@ -8,6 +10,8 @@ const AllVideosPage = () => {
     const [uploaderByVideoNo, setUploaderByVideoNo] = useState(new Map());
     const [sortKey, setSortKey] = useState('video'); // 'video' | 'start' | 'uptime' | 'messages'
     const [sortDir, setSortDir] = useState('desc'); // 'asc' | 'desc'
+    const [searchQuery, setSearchQuery] = useState('');
+    const listParentRef = useRef(null);
 
     useEffect(() => {
         let aborted = false;
@@ -46,6 +50,7 @@ const AllVideosPage = () => {
                     for (const rp of replays) {
                         const videoNo = rp?.videoNo;
                         if (videoNo != null && !byVideoNo.has(String(videoNo))) {
+                            const title = rp?.title || null;
                             const start = rp?.start || null;
                             const end = rp?.end || null;
                             let durationSec = null;
@@ -56,7 +61,7 @@ const AllVideosPage = () => {
                                     durationSec = Math.floor((e - s) / 1000);
                                 }
                             }
-                            byVideoNo.set(String(videoNo), { name, channelId, image, start, end, durationSec });
+                            byVideoNo.set(String(videoNo), { name, title, channelId, image, start, end, durationSec });
                         }
                     }
                 }
@@ -118,6 +123,7 @@ const AllVideosPage = () => {
                 uptimeText,
                 uptimeSec,
                 totalMessages,
+                title: uploader?.title || v?.title || '',
             };
         }).filter((x) => !!x.videoId);
         parsed.sort((a, b) => {
@@ -143,6 +149,42 @@ const AllVideosPage = () => {
         return parsed;
     }, [videos, uploaderByVideoNo, sortKey, sortDir]);
 
+    const filteredItems = useMemo(() => {
+        const query = searchQuery.trim().toLowerCase();
+        if (!query) return items;
+
+        const queryKeys = hangulToKeystrokes(query);
+        const maxDistance = query.length <= 4 ? 1 : 2;
+
+        return items.filter((item) => {
+            const candidates = [
+                item.title || '',
+                item.uploader?.name || '',
+                item.uploader?.channelId || '',
+                item.videoId || '',
+            ];
+
+            return candidates.some((candidate) => {
+                if (!candidate) return false;
+                const target = String(candidate).toLowerCase();
+                if (target.includes(query)) return true;
+
+                const targetKeys = hangulToKeystrokes(target);
+                if (queryKeys && targetKeys.includes(queryKeys)) return true;
+
+                if (!queryKeys || !targetKeys) return false;
+                return levenshteinDistance(queryKeys, targetKeys, maxDistance) <= maxDistance;
+            });
+        });
+    }, [items, searchQuery]);
+
+    const listVirtualizer = useVirtualizer({
+        count: filteredItems.length,
+        getScrollElement: () => listParentRef.current,
+        estimateSize: () => 84,
+        overscan: 10,
+    });
+
     const toggleSort = (key) => {
         if (sortKey === key) {
             setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
@@ -160,9 +202,28 @@ const AllVideosPage = () => {
 
     return (
         <div className="min-h-screen bg-slate-950/95 text-slate-100">
-            <div className="pt-24 max-w-6xl mx-auto">
+            <div className="pt-24 max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
                 <h1 className="text-2xl md:text-3xl font-bold mb-2 text-teal-300">모든 비디오 목록</h1>
-                <p className="text-sm text-slate-300 mb-6">채팅 기록이 있는 총 {items.length.toLocaleString()}개 비디오</p>
+                <p className="text-sm text-slate-300">채팅 기록이 있는 총 {items.length.toLocaleString()}개 비디오</p>
+                <p className="text-xs text-slate-400 mb-6">모든 채팅 기록은 개인정보가 지워진 상태로 제공됩니다.</p>
+                <div className="mb-6 flex flex-col gap-2">
+                    <label htmlFor="all-videos-search" className="text-xs text-slate-400 uppercase tracking-wide">
+                        검색
+                    </label>
+                    <input
+                        id="all-videos-search"
+                        type="text"
+                        placeholder="제목 또는 스트리머 이름 입력"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full rounded-lg border border-slate-700/70 bg-slate-900/70 px-4 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-teal-400 focus:outline-none focus:ring-1 focus:ring-teal-400"
+                    />
+                    {searchQuery.trim() ? (
+                        <p className="text-xs text-slate-400">
+                            검색 결과: {filteredItems.length.toLocaleString()}개
+                        </p>
+                    ) : null}
+                </div>
 
                 {loading ? (
                     <div className="text-slate-300">불러오는 중...</div>
@@ -174,17 +235,18 @@ const AllVideosPage = () => {
                             <button
                                 type="button"
                                 onClick={() => toggleSort('video')}
-                                className="text-left col-span-3 md:col-span-2 hover:text-teal-300"
+                                className="text-left col-span-3 md:col-span-2 lg:col-span-1 hover:text-teal-300"
                                 aria-label="Video 정렬"
                                 title="Video 정렬"
                             >
                                 Video{sortIndicator('video')}
                             </button>
-                            <div className="col-span-5 md:col-span-3">Profile</div>
+                            <div className="col-span-9 md:col-span-2 lg:col-span-3 text-left">Title</div>
+                            <div className="col-span-12 md:col-span-2 lg:col-span-2">Profile</div>
                             <button
                                 type="button"
                                 onClick={() => toggleSort('start')}
-                                className="hidden md:block md:col-span-2 text-left hover:text-teal-300"
+                                className="hidden md:block md:col-span-2 lg:col-span-2 text-left hover:text-teal-300"
                                 aria-label="Start Time 정렬"
                                 title="Start Time 정렬"
                             >
@@ -208,71 +270,92 @@ const AllVideosPage = () => {
                             >
                                 Messages{sortIndicator('messages')}
                             </button>
-                            <div className="col-span-4 md:col-span-3">Links</div>
+                            <div className="col-span-12 md:col-span-2 lg:col-span-2">Links</div>
                         </div>
-                        <ul className="divide-y divide-slate-800/80">
-                            {items.map((item) => (
-                                <li key={item.videoId} className="grid grid-cols-12 gap-0 px-3 py-3 bg-slate-900/40 hover:bg-slate-900/60">
-                                    <div className="col-span-3 md:col-span-2 text-slate-100 font-mono">ID: {item.videoId}</div>
-                                    <div className="col-span-5 md:col-span-3 flex items-center gap-3">
-                                        {item.uploader?.image ? (
-                                            <img
-                                                src={item.uploader.image}
-                                                alt=""
-                                                className="h-8 w-8 rounded-full object-cover flex-none"
-                                                loading="lazy"
-                                            />
-                                        ) : (
-                                            <div className="h-8 w-8 rounded-full bg-slate-800/70 flex-none" />
-                                        )}
-                                        <div className="min-w-0">
-                                            <div className="text-slate-100 text-sm font-semibold truncate">
-                                                {item.uploader?.name || '알 수 없음'}
+                        <div ref={listParentRef} className="relative max-h-[70vh] overflow-y-auto bg-slate-900/10">
+                            {filteredItems.length === 0 ? (
+                                <div className="px-3 py-6 text-slate-300">표시할 비디오가 없습니다.</div>
+                            ) : (
+                                <div style={{ height: `${listVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+                                    {listVirtualizer.getVirtualItems().map((virtualRow) => {
+                                        const item = filteredItems[virtualRow.index];
+                                        if (!item) return null;
+                                        return (
+                                            <div
+                                                key={virtualRow.key}
+                                                data-index={virtualRow.index}
+                                                ref={listVirtualizer.measureElement}
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: 0,
+                                                    left: 0,
+                                                    width: '100%',
+                                                    transform: `translateY(${virtualRow.start}px)`,
+                                                }}
+                                                className="grid grid-cols-12 gap-0 px-3 py-3 border-b border-slate-800/80 bg-slate-900/40 hover:bg-slate-900/60"
+                                            >
+                                                <div className="col-span-3 md:col-span-2 lg:col-span-1 text-slate-100 font-mono">ID: {item.videoId}</div>
+                                                <div className="col-span-9 md:col-span-2 lg:col-span-3 text-slate-200 text-sm font-semibold truncate">
+                                                    {item.title || '-'}
+                                                </div>
+                                                <div className="col-span-12 md:col-span-2 lg:col-span-2 flex items-center gap-3">
+                                                    {item.uploader?.image ? (
+                                                        <img
+                                                            src={item.uploader.image}
+                                                            alt=""
+                                                            className="h-8 w-8 rounded-full object-cover flex-none"
+                                                            loading="lazy"
+                                                        />
+                                                    ) : (
+                                                        <div className="h-8 w-8 rounded-full bg-slate-800/70 flex-none" />
+                                                    )}
+                                                    <div className="min-w-0">
+                                                        <div className="text-slate-100 text-sm font-semibold truncate">
+                                                            {item.uploader?.name || '알 수 없음'}
+                                                        </div>
+                                                        <div className="text-slate-400 text-xs font-mono truncate">
+                                                            {item.uploader?.channelId || '-'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="hidden md:block md:col-span-2 lg:col-span-2 text-slate-300">{item.startDisplay || '-'}</div>
+                                                <div className="hidden md:block md:col-span-1 text-slate-300">{item.uptimeText}</div>
+                                                <div className="hidden md:block md:col-span-1 text-slate-300">{item.totalMessages?.toLocaleString?.() ?? item.totalMessages}</div>
+                                                <div className="col-span-12 md:col-span-2 lg:col-span-2 flex flex-nowrap gap-2 flex-wrap md:flex-nowrap mt-2 md:mt-0">
+                                                    <a
+                                                        href={item.originalUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center rounded-full border border-slate-700/70 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800/70"
+                                                        title="치지직 원본"
+                                                    >
+                                                        영상
+                                                    </a>
+                                                    <a
+                                                        href={item.chatLogUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center rounded-full border border-slate-700/70 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800/70"
+                                                        title="채팅 로그 파일"
+                                                    >
+                                                        채팅 로그
+                                                    </a>
+                                                    <Link
+                                                        to={item.inAppChatUrl}
+                                                        className="inline-flex items-center rounded-full border border-slate-700/70 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800/70"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        title="채팅 타임라인"
+                                                    >
+                                                        채팅 타임라인
+                                                    </Link>
+                                                </div>
                                             </div>
-                                            <div className="text-slate-400 text-xs font-mono truncate">
-                                                {item.uploader?.channelId || '-'}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="hidden md:block md:col-span-2 text-slate-300">{item.startDisplay || '-'}</div>
-                                    <div className="hidden md:block md:col-span-1 text-slate-300">{item.uptimeText}</div>
-                                    <div className="hidden md:block md:col-span-1 text-slate-300">{item.totalMessages?.toLocaleString?.() ?? item.totalMessages}</div>
-                                    <div className="col-span-4 md:col-span-3 flex flex-nowrap gap-2">
-                                        <a
-                                            href={item.originalUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center rounded-full border border-slate-700/70 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800/70"
-                                            title="치지직 원본"
-                                        >
-                                            영상
-                                        </a>
-                                        <a
-                                            href={item.chatLogUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center rounded-full border border-slate-700/70 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800/70"
-                                            title="채팅 로그 파일"
-                                        >
-                                            채팅 로그
-                                        </a>
-                                        <Link
-                                            to={item.inAppChatUrl}
-                                            className="inline-flex items-center rounded-full border border-slate-700/70 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800/70"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            title="채팅 타임라인"
-                                        >
-                                            채팅 타임라인
-                                        </Link>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-
-                        {items.length === 0 ? (
-                            <div className="px-3 py-6 text-slate-300">표시할 비디오가 없습니다.</div>
-                        ) : null}
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
