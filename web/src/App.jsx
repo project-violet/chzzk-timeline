@@ -5,6 +5,7 @@ import TimelinePage from './pages/Timeline/TimelinePage.jsx';
 import ChatPage from './pages/Chat/ChatPage.jsx';
 import AllVideosPage from './pages/Static/AllVideosPage.jsx';
 import ChannelPage from './pages/Channel/ChannelPage.jsx';
+import LiveChatPage from './pages/LiveChat/LiveChatPage.jsx';
 
 const MapPinIcon = (props) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true" {...props}>
@@ -34,7 +35,6 @@ const ClockIcon = (props) => (
   </svg>
 );
 
-
 const StreamerIcon = (props) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true" {...props}>
     <circle cx="12" cy="7.5" r="3.5" strokeWidth="1.5" />
@@ -47,9 +47,23 @@ const StreamerIcon = (props) => (
   </svg>
 );
 
+const ChatBubbleIcon = (props) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true" {...props}>
+    <path
+      d="M7 17L5 21L9 19H17C18.6569 19 20 17.6569 20 16V8C20 6.34315 18.6569 5 17 5H7C5.34315 5 4 6.34315 4 8V16C4 17.6569 5.34315 19 7 19H9"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path d="M9 11H15" strokeWidth="1.5" strokeLinecap="round" />
+    <path d="M9 8H13" strokeWidth="1.5" strokeLinecap="round" />
+  </svg>
+);
+
 const navItems = [
-  { to: '/map', label: '치지직 맵', Icon: MapPinIcon },
-  { to: '/timeline', label: '치지직 타임라인', Icon: ClockIcon },
+  { to: '/map', label: '지직 맵', Icon: MapPinIcon },
+  { to: '/timeline', label: '지직 타임라인', Icon: ClockIcon },
+  { to: '/live-chat', label: 'Live Chat', Icon: ChatBubbleIcon },
 ];
 
 const externalLinks = [
@@ -157,7 +171,7 @@ const App = () => {
               type="button"
               onClick={() => setIsInfoOpen(false)}
               className="absolute right-4 top-4 rounded-full px-3 py-1 text-sm font-semibold text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
-              aria-label="정보 창 닫기"
+              aria-label="정보 닫기"
             >
               닫기
             </button>
@@ -171,9 +185,9 @@ const App = () => {
               https://github.com/project-violet/chzzk-timeline
             </a>
             <div className="mt-6 space-y-2 text-sm text-slate-200">
-              <p>치지직 다시보기 정보를 스트리머 별로 타임라인으로 보여줍니다</p>
-              <p>모든 정보는 누구나 접근 가능한 치지직 공개 API를 통해 얻고 있습니다</p>
-              <p>이 프로젝트는 오픈소스이며 누구나 자유롭게 사용할 수 있습니다</p>
+              <p>치지직 다시보기 정보를 스트리머 별로 타임라인으로 보여줍니다.</p>
+              <p>모든 정보는 공개 API를 통해 수집한 자료입니다.</p>
+              <p>본 프로젝트는 오픈 소스로 누구나 자유롭게 이용 가능합니다.</p>
               <p>문의: violet.dev.master@gmail.com</p>
             </div>
           </div>
@@ -187,13 +201,14 @@ const App = () => {
           <Route path="/timeline" element={<TimelinePage />} />
           <Route path="/chat/:videoId" element={<ChatPage />} />
           <Route path="/channel/:channelId" element={<ChannelPage />} />
+          <Route path="/live-chat" element={<LiveChatPage />} />
           <Route path="/static/videos" element={<AllVideosPage />} />
         </Routes>
       </div>
 
       <footer className="relative w-full py-6 pr-6 text-right text-xs text-slate-500 bg-slate-950/95">
-        <p>치지직 타임라인은 "치지직"과 무관한 서드파티 프로젝트입니다.</p>
-        <p>"치지직" 혹은 "CHZZK" 은 NAVER Corp.의 등록 상표입니다.</p>
+        <p>치지직 타임라인은 "치지직" 팬 커뮤니티 프로젝트입니다.</p>
+        <p>"치지직" 및 "CHZZK"는 NAVER Corp.의 등록 상표입니다.</p>
         <p>© 2025 violet-dev. ALL RIGHTS RESERVED.</p>
       </footer>
     </div>
