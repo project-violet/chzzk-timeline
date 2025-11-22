@@ -1069,7 +1069,7 @@ const LiveChatPage = () => {
                       </div>
                       <div className="text-right text-xs text-slate-400">
                         <div className="font-semibold text-white">{ch.count} msgs</div>
-                        <div className="opacity-80">최근 500개 기준</div>
+                        <div className="opacity-80">최근 1분 기준</div>
                       </div>
                     </div>
                     <MiniCandleChart candles={candles} maxValue={ch.count} />

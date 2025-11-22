@@ -5,8 +5,8 @@ use color_eyre::eyre::Result;
 use futures::{SinkExt, StreamExt};
 use once_cell::sync::Lazy;
 use serde_json::Value;
-use tokio::{net::TcpListener, time};
 use tokio::sync::broadcast;
+use tokio::{net::TcpListener, time};
 use tokio_tungstenite::{
     accept_async, connect_async,
     tungstenite::{client::IntoClientRequest, Message},
@@ -231,13 +231,13 @@ async fn handle_ws_message(
             for chat in bdy {
                 if let Some(uid) = chat["uid"].as_str() {
                     // db.insertChat({ channelId, userId }) 역할 대신 println
-                    println!(
-                        "CHAT channelId={} userId={}, msg={}, raw={:?}",
-                        live.channel_id,
-                        uid,
-                        chat["msg"].as_str().unwrap_or(""),
-                        chat
-                    );
+                    // println!(
+                    //     "CHAT channelId={} userId={}, msg={}, raw={:?}",
+                    //     live.channel_id,
+                    //     uid,
+                    //     chat["msg"].as_str().unwrap_or(""),
+                    //     chat
+                    // );
 
                     publish_live_chat(live, uid, chat);
                 }
