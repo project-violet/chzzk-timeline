@@ -3,7 +3,8 @@ import { CandlestickSeries, createChart, LineSeries } from 'lightweight-charts';
 
 const WS_URLS = {
   localhost: 'ws://localhost:12003',
-  remote: 'ws://132.145.91.45:12003',
+  // remote: 'wss://wss.koromo.cc/ws',
+  remote: 'wss://koromo.cc/ws',
 };
 
 const StatusBadge = ({ status }) => {
@@ -826,8 +827,8 @@ const LiveChatPage = () => {
                 onChange={(e) => setWsUrlKey(e.target.value)}
                 className="rounded-lg border border-slate-700/70 bg-slate-800/50 px-3 py-1.5 text-xs text-white outline-none transition focus:border-teal-400/70 focus:ring-2 focus:ring-teal-400/20"
               >
+                <option value="remote">wss.koromo.cc</option>
                 <option value="localhost">localhost:12003</option>
-                <option value="remote">132.145.91.45:12003</option>
               </select>
               <span className="text-xs text-slate-500">{wsUrl}</span>
             </div>
