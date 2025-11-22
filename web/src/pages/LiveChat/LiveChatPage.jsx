@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CandlestickSeries, createChart, LineSeries } from 'lightweight-charts';
 
-const WS_URL = import.meta.env.VITE_LIVE_CHAT_WS_URL || 'ws://localhost:12003';
+const WS_URLS = {
+  localhost: 'ws://localhost:12003',
+  remote: 'ws://132.145.91.45:12003',
+};
 
 const StatusBadge = ({ status }) => {
   const color =
@@ -305,6 +308,11 @@ const LiveChatPage = () => {
   const [candleTimeframe, setCandleTimeframe] = useState(5);
   // 유저별 채널 정보: userId -> Map<channelId, count>
   const [userChannelMap, setUserChannelMap] = useState(new Map());
+  // WebSocket URL 선택
+  const [wsUrlKey, setWsUrlKey] = useState(
+    import.meta.env.VITE_LIVE_CHAT_WS_URL || 'remote'
+  );
+  const wsUrl = WS_URLS[wsUrlKey] || WS_URLS.localhost;
 
   useEffect(() => {
     let ws;
@@ -383,7 +391,7 @@ const LiveChatPage = () => {
       setStatus('connecting');
       setLastError('');
 
-      ws = new WebSocket(WS_URL);
+      ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
         if (stop) return;
@@ -474,7 +482,7 @@ const LiveChatPage = () => {
         ws.close();
       }
     };
-  }, []);
+  }, [wsUrl]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -809,9 +817,20 @@ const LiveChatPage = () => {
             <p className="text-sm font-semibold text-teal-200">Live Chat Aggregator</p>
             <h1 className="mt-1 text-2xl font-bold text-white">실시간 채팅 모니터</h1>
             <p className="mt-2 text-sm text-slate-300">
-              scrap_chat에서 수집한 모든 메시지를 단일 웹소켓으로 전달합니다. 기본 주소는{' '}
-              <span className="font-semibold text-teal-200">{WS_URL}</span> 입니다.
+              scrap_chat에서 수집한 모든 메시지를 단일 웹소켓으로 전달합니다.
             </p>
+            <div className="mt-3 flex items-center gap-3">
+              <label className="text-xs font-semibold text-slate-400">WebSocket URL:</label>
+              <select
+                value={wsUrlKey}
+                onChange={(e) => setWsUrlKey(e.target.value)}
+                className="rounded-lg border border-slate-700/70 bg-slate-800/50 px-3 py-1.5 text-xs text-white outline-none transition focus:border-teal-400/70 focus:ring-2 focus:ring-teal-400/20"
+              >
+                <option value="localhost">localhost:12003</option>
+                <option value="remote">132.145.91.45:12003</option>
+              </select>
+              <span className="text-xs text-slate-500">{wsUrl}</span>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <StatusBadge status={status} />
