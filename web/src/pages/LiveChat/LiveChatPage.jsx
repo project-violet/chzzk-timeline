@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CandlestickSeries, createChart, LineSeries } from 'lightweight-charts';
 
+const TOP_COUNT = 9;
+
 const WS_URLS = {
   localhost: 'ws://localhost:12003',
   // remote: 'wss://wss.koromo.cc/ws',
@@ -192,7 +194,7 @@ const UnifiedLineChart = ({ channels, rankingHistory, channelMeta }) => {
 
     const seriesMap = new Map();
 
-    for (let i = 0; i < channels.length && i < 9; i++) {
+    for (let i = 0; i < channels.length && i < TOP_COUNT; i++) {
       const channel = channels[i];
       const channelId = channel.channelId;
       const history = rankingHistory.get(channelId) || [];
@@ -563,7 +565,7 @@ const LiveChatPage = () => {
       .slice(0, 10);
   }, [messages]);
 
-  const topChannels = useMemo(() => channelRanking.slice(0, 9), [channelRanking]);
+  const topChannels = useMemo(() => channelRanking.slice(0, TOP_COUNT), [channelRanking]);
 
   // 랭킹이 변경될 때마다 (timestamp, 메시지 수) 저장
   useEffect(() => {
@@ -811,16 +813,16 @@ const LiveChatPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950/95 pt-28 pb-10 text-slate-100">
+    <div className="min-h-screen bg-slate-950/95 pt-6 pb-10 text-slate-100">
       <div className="mx-auto flex max-w-8xl flex-col gap-6 px-6">
         <header className="flex flex-col gap-3 rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-sm font-semibold text-teal-200">Live Chat Aggregator</p>
             <h1 className="mt-1 text-2xl font-bold text-white">실시간 채팅 모니터</h1>
-            <p className="mt-2 text-sm text-slate-300">
+            {/* <p className="mt-2 text-sm text-slate-300">
               scrap_chat에서 수집한 모든 메시지를 단일 웹소켓으로 전달합니다.
-            </p>
-            <div className="mt-3 flex items-center gap-3">
+            </p> */}
+            {/* <div className="mt-3 flex items-center gap-3">
               <label className="text-xs font-semibold text-slate-400">WebSocket URL:</label>
               <select
                 value={wsUrlKey}
@@ -831,7 +833,7 @@ const LiveChatPage = () => {
                 <option value="localhost">localhost:12003</option>
               </select>
               <span className="text-xs text-slate-500">{wsUrl}</span>
-            </div>
+            </div> */}
           </div>
           <div className="flex items-center gap-3">
             <StatusBadge status={status} />
@@ -994,8 +996,8 @@ const LiveChatPage = () => {
               <p className="text-xs font-semibold uppercase tracking-wide text-teal-200">
                 Channel Ranking
               </p>
-              <h3 className="text-lg font-bold text-white">통합 변동 차트 (Top 9)</h3>
-              <p className="text-sm text-slate-400 mt-1">랭킹 상위 9개 채널의 메시지 수 변동을 실선으로 표시</p>
+              <h3 className="text-lg font-bold text-white">통합 변동 차트 (Top {TOP_COUNT})</h3>
+              <p className="text-sm text-slate-400 mt-1">랭킹 상위 {TOP_COUNT}개 채널의 메시지 수 변동을 실선으로 표시</p>
             </div>
           </div>
           <UnifiedLineChart
@@ -1011,7 +1013,7 @@ const LiveChatPage = () => {
               <p className="text-xs font-semibold uppercase tracking-wide text-teal-200">
                 Channel Ranking
               </p>
-              <h3 className="text-lg font-bold text-white">랭킹 변동 캔들 차트 (Top 9)</h3>
+              <h3 className="text-lg font-bold text-white">랭킹 변동 캔들 차트 (Top {TOP_COUNT})</h3>
             </div>
             <div className="flex flex-col items-end gap-2">
               <div className="flex items-center gap-2 rounded-lg border border-slate-700/70 bg-slate-800/50 p-1">
