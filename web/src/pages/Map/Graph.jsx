@@ -125,7 +125,7 @@ function Graph({ data, selectedChannel, setSelectedChannel }) {
     );
 
     /* ---------- 클러스터 라벨 계산 ---------- */
-    const CLUSTER_TH = 0.25; // 군집 형성 임계치
+    const CLUSTER_TH = 0.4; // 군집 형성 임계치
     const clusteredData = useMemo(() => {
         const n = data.nodes.map((d) => ({ ...d }));
         const l = data.links.map((d) => ({ ...d }));
