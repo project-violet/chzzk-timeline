@@ -114,6 +114,99 @@ cargo build --release
 cargo install --path .
 ```
 
+### 4. Docker 빌드
+
+Docker를 사용하여 Linux용 바이너리를 빌드할 수 있습니다.
+
+#### 기본 빌드
+
+```bash
+# Linux/macOS
+./build.sh
+
+# Windows
+build.bat
+
+# 또는 직접 Docker 명령 사용
+docker build -t chzzk-chat:latest .
+```
+
+#### 특정 태그로 빌드
+
+```bash
+# Linux/macOS
+./build.sh v1.0.0
+
+# Windows
+build.bat v1.0.0
+
+# 또는 직접 Docker 명령 사용
+docker build -t chzzk-chat:v1.0.0 .
+```
+
+#### 빌드된 이미지 실행
+
+```bash
+# 실시간 채팅 수집 모드
+docker run -p 12003:12003 chzzk-chat:latest live-chat-test
+
+# 채팅 분석 모드 (볼륨 마운트 필요)
+docker run -v /path/to/data:/app/data chzzk-chat:latest analysis-chat --files /app/data/file.json
+```
+
+### 5. Docker 배포
+
+빌드된 이미지를 레지스트리에 배포할 수 있습니다.
+
+#### Docker Hub에 배포
+
+```bash
+# 1. Docker Hub에 로그인
+docker login
+
+# 2. 배포 스크립트 실행
+./deploy.sh docker.io/username
+
+# 또는 직접 푸시
+docker tag chzzk-chat:latest docker.io/username/chzzk-chat:latest
+docker push docker.io/username/chzzk-chat:latest
+```
+
+#### GitHub Container Registry에 배포
+
+```bash
+# 1. GitHub에 로그인
+echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
+
+# 2. 배포 스크립트 실행
+./deploy.sh ghcr.io/username/chzzk-chat v1.0.0
+
+# 또는 직접 푸시
+docker tag chzzk-chat:latest ghcr.io/username/chzzk-chat:v1.0.0
+docker push ghcr.io/username/chzzk-chat:v1.0.0
+```
+
+#### 다른 레지스트리에 배포
+
+```bash
+# 배포 스크립트 사용
+./deploy.sh registry.example.com/chzzk-chat latest
+
+# 또는 직접 푸시
+docker tag chzzk-chat:latest registry.example.com/chzzk-chat:latest
+docker push registry.example.com/chzzk-chat:latest
+```
+
+#### 실행
+
+```bash
+sudo docker run \
+  -p 12003:12003 \
+  -e MIN_LIVE_USER=500 \
+  docker.io/violetdev/chzzk-chat:latest \
+  live-chat-test
+```
+
 ## 사용법
 
 ### 실시간 채팅 테스트 모드
