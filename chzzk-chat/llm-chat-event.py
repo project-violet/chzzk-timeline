@@ -232,6 +232,73 @@ def run_model(
     return r2
 
 
+def process_file(
+    input_path: str,
+    models: list[str],
+    max_tokens: int,
+    temperature: float,
+    timeout_s: float,
+    reasoning: str | None,
+    retry_on_bad_format: bool,
+    threads: int,
+    do_denoise: bool,
+    dedup_run_min: int,
+    max_lines: int,
+):
+    """단일 파일을 처리하고 LLM을 실행하여 결과를 출력"""
+    raw_text = open(input_path, "r", encoding="utf-8").read()
+    cleaned = strip_timestamps(raw_text)
+
+    lines = cleaned.splitlines()
+
+    if do_denoise:
+        lines = preprocess_chat_lines(lines, dedup_run_min=max(2, dedup_run_min))
+    else:
+        lines = [ln.strip() for ln in lines if ln.strip()]
+
+    if max_lines and max_lines > 0 and len(lines) > max_lines:
+        lines = lines[-max_lines:]
+
+    chat_text = "\n".join(lines)
+    messages = build_messages(chat_text)
+
+    # 병렬 실행
+    results = []
+    with ThreadPoolExecutor(max_workers=max(1, threads)) as ex:
+        futs = {
+            ex.submit(
+                run_model,
+                m,
+                messages,
+                max_tokens,
+                temperature,
+                timeout_s,
+                reasoning,
+                retry_on_bad_format,
+            ): m
+            for m in models
+        }
+        for fut in as_completed(futs):
+            try:
+                results.append(fut.result())
+            except Exception as e:
+                results.append({"model": futs[fut], "error": repr(e)})
+
+    # 출력
+    for r in sorted(
+        results, key=lambda x: (x.get("error") is not None, x.get("latency_ms") or 1e18)
+    ):
+        print("=" * 80)
+        print(f"MODEL: {r.get('model')}")
+        if r.get("error"):
+            print(f"ERROR: {r['error']}")
+            continue
+        print(
+            f"LATENCY: {r['latency_ms']:.1f}ms | TOKENS: prompt={r.get('prompt_tokens')} completion={r.get('completion_tokens')} total={r.get('total_tokens')}"
+        )
+        print(r.get("text", ""))
+
+
 def main():
     load_dotenv()
 
@@ -250,7 +317,7 @@ def main():
     }
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--input", required=True, help="원본 채팅 txt 파일")
+    ap.add_argument("--input", required=True, help="원본 채팅 txt 파일 또는 폴더 경로")
     ap.add_argument(
         "--engine", default=None, choices=sorted(engines.keys()), help="프리셋 엔진"
     )
@@ -299,28 +366,12 @@ def main():
 
     args = ap.parse_args()
 
-    raw_text = open(args.input, "r", encoding="utf-8").read()
-    cleaned = strip_timestamps(raw_text)
-
-    lines = cleaned.splitlines()
-
     # 기본은 denoise ON으로 추천(하지만 기존 동작 유지 원하면 --no_denoise)
     do_denoise = True
     if args.no_denoise:
         do_denoise = False
     if args.denoise:
         do_denoise = True
-
-    if do_denoise:
-        lines = preprocess_chat_lines(lines, dedup_run_min=max(2, args.dedup_run_min))
-    else:
-        lines = [ln.strip() for ln in lines if ln.strip()]
-
-    if args.max_lines and args.max_lines > 0 and len(lines) > args.max_lines:
-        lines = lines[-args.max_lines :]
-
-    chat_text = "\n".join(lines)
-    messages = build_messages(chat_text)
 
     # 실행할 모델들 결정
     if args.models:
@@ -342,41 +393,56 @@ def main():
             engines["gpt52"],
         ]
 
-    # 병렬 실행
-    results = []
-    with ThreadPoolExecutor(max_workers=max(1, args.threads)) as ex:
-        futs = {
-            ex.submit(
-                run_model,
-                m,
-                messages,
+    # 입력이 파일인지 폴더인지 확인
+    input_path = args.input
+    if os.path.isfile(input_path):
+        # 단일 파일 처리
+        process_file(
+            input_path,
+            models,
+            args.max_tokens,
+            args.temperature,
+            args.timeout,
+            args.reasoning,
+            args.retry_on_bad_format,
+            args.threads,
+            do_denoise,
+            args.dedup_run_min,
+            args.max_lines,
+        )
+    elif os.path.isdir(input_path):
+        # 폴더인 경우 파일명 순으로 정렬하여 각 파일 처리
+        file_list = [
+            f
+            for f in os.listdir(input_path)
+            if os.path.isfile(os.path.join(input_path, f))
+        ]
+        file_list.sort()  # 파일명 순으로 정렬
+
+        if not file_list:
+            print(f"경고: 폴더 '{input_path}'에 파일이 없습니다.")
+            return
+
+        for idx, filename in enumerate(file_list, 1):
+            file_path = os.path.join(input_path, filename)
+            print()
+            print(f"# 파일 {idx}/{len(file_list)}: {filename}")
+            process_file(
+                file_path,
+                models,
                 args.max_tokens,
                 args.temperature,
                 args.timeout,
                 args.reasoning,
                 args.retry_on_bad_format,
-            ): m
-            for m in models
-        }
-        for fut in as_completed(futs):
-            try:
-                results.append(fut.result())
-            except Exception as e:
-                results.append({"model": futs[fut], "error": repr(e)})
-
-    # 출력
-    for r in sorted(
-        results, key=lambda x: (x.get("error") is not None, x.get("latency_ms") or 1e18)
-    ):
-        print("=" * 80)
-        print(f"MODEL: {r.get('model')}")
-        if r.get("error"):
-            print(f"ERROR: {r['error']}")
-            continue
-        print(
-            f"LATENCY: {r['latency_ms']:.1f}ms | TOKENS: prompt={r.get('prompt_tokens')} completion={r.get('completion_tokens')} total={r.get('total_tokens')}"
-        )
-        print(r.get("text", ""))
+                args.threads,
+                do_denoise,
+                args.dedup_run_min,
+                args.max_lines,
+            )
+    else:
+        print(f"오류: '{input_path}'는 유효한 파일 또는 폴더가 아닙니다.")
+        return
 
 
 if __name__ == "__main__":
