@@ -39,6 +39,7 @@ export const CONTENT_FILTER_GROUPS = [
     { label: '프로젝트아이', group: '그룹', category: '', description: '', keywords: ['프로젝트아이'], tags: ['프로젝트아이'] },
     { label: '에스더', group: '그룹', category: '', description: '', keywords: ['에스더'], tags: ['에스더'] },
     { label: '그림프로덕션', group: '그룹', category: '', description: '', keywords: ['그림프로덕션'], tags: ['그림프로덕션'] },
+    { label: '미츄', group: '그룹', category: '', description: '', keywords: ['미츄'], tags: ['미츄'] },
 ];
 
 const NAV_OFFSET_REM = 6;
