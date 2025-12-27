@@ -9,6 +9,7 @@ use rayon::prelude::*;
 #[derive(Debug, Clone)]
 pub struct ReplayWithChannel {
     pub replay: Replay,
+    #[allow(dead_code)]
     pub channel_id: String,
     pub channel_name: String,
 }
@@ -69,9 +70,7 @@ pub fn cluster_similar_replays(
     let mut video_ids_with_chat_log: HashSet<u64> = HashSet::new();
     for chat_log in chat_logs {
         video_ids_with_chat_log.insert(chat_log.video_id);
-        let viewers = video_viewers
-            .entry(chat_log.video_id)
-            .or_insert_with(HashSet::new);
+        let viewers = video_viewers.entry(chat_log.video_id).or_default();
         for message in &chat_log.messages {
             viewers.insert(message.user_id.clone());
         }
@@ -166,7 +165,7 @@ pub fn cluster_similar_replays(
     let mut cluster_map: HashMap<usize, Vec<usize>> = HashMap::new();
     for i in 0..n {
         let root = find(&mut parent, i);
-        cluster_map.entry(root).or_insert_with(Vec::new).push(i);
+        cluster_map.entry(root).or_default().push(i);
     }
 
     // replays_with_channel과 video_viewers를 Arc에서 다시 가져오기

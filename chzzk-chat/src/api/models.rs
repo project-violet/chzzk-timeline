@@ -75,6 +75,7 @@ pub struct LiveDetailResponse {
 pub struct LiveReady {
     pub channel_id: String,
     pub chat_channel_id: String,
+    #[allow(dead_code)]
     pub follower_count: u64,
 }
 

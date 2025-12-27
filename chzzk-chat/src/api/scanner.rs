@@ -36,21 +36,10 @@ pub async fn scan_channels() -> Result<()> {
                 let detail_opt = detail_result.ok().flatten();
                 let live_detail_opt = live_detail_result.ok().flatten();
 
-                let Some(detail) = detail_opt else {
-                    return None;
-                };
-
-                let Some(follower_count) = detail.follower_count else {
-                    return None;
-                };
-
-                let Some(live_detail) = live_detail_opt else {
-                    return None;
-                };
-
-                let Some(chat_channel_id) = live_detail.chat_channel_id.clone() else {
-                    return None;
-                };
+                let detail = detail_opt?;
+                let follower_count = detail.follower_count?;
+                let live_detail = live_detail_opt?;
+                let chat_channel_id = live_detail.chat_channel_id.clone()?;
 
                 let ready_live = LiveReady {
                     channel_id,

@@ -56,9 +56,7 @@ fn build_video_user_map(chat_logs: &[ChatLog]) -> HashMap<u64, HashSet<String>> 
     let mut video_users: HashMap<u64, HashSet<String>> = HashMap::new();
 
     for chat_log in chat_logs {
-        let users = video_users
-            .entry(chat_log.video_id)
-            .or_insert_with(HashSet::new);
+        let users = video_users.entry(chat_log.video_id).or_default();
 
         for message in &chat_log.messages {
             users.insert(message.user_id.clone());
@@ -102,6 +100,7 @@ fn calculate_user_overlap_similarity(
 ///
 /// # Returns
 /// 시간 범위가 겹치고 채팅 유저가 겹치는 리플레이들의 연관도 정보
+#[allow(dead_code)]
 pub fn find_related_replays(
     target_video_no: u64,
     channels: &[ChannelWithReplays],
@@ -210,6 +209,7 @@ pub fn find_related_replays(
 }
 
 /// 연관된 리플레이 정보를 출력합니다.
+#[allow(dead_code)]
 pub fn print_related_replays(relations: &[VideoRelation], max_count: Option<usize>) {
     let display_count = max_count.unwrap_or(relations.len()).min(relations.len());
 
@@ -326,12 +326,12 @@ pub fn analyze_all_video_relations(
 
             // 대상 비디오의 시간 범위 파싱
             let target_start = match time_cache_ref.get(target_replay.start.as_str()) {
-                Some(dt) => dt.clone(),
+                Some(dt) => *dt,
                 None => return None,
             };
 
             let target_end = match time_cache_ref.get(target_replay.end.as_str()) {
-                Some(dt) => dt.clone(),
+                Some(dt) => *dt,
                 None => return None,
             };
 
@@ -354,12 +354,12 @@ pub fn analyze_all_video_relations(
 
                     // 시간 범위 파싱
                     let candidate_start = match time_cache_ref.get(replay.start.as_str()) {
-                        Some(dt) => dt.clone(),
+                        Some(dt) => *dt,
                         None => continue,
                     };
 
                     let candidate_end = match time_cache_ref.get(replay.end.as_str()) {
-                        Some(dt) => dt.clone(),
+                        Some(dt) => *dt,
                         None => continue,
                     };
 

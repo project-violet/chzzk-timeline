@@ -1,9 +1,6 @@
-use std::fs;
-use std::io::Write;
-use std::path::Path;
 use std::time::Duration;
 
-use color_eyre::eyre::{Context, Result};
+use color_eyre::eyre::Result;
 use mimalloc::MiMalloc;
 use structopt::StructOpt;
 use tokio::time;
@@ -155,8 +152,8 @@ pub fn load_channels_and_chat_logs(
 }
 
 fn run_channel_distance_analysis(
-    channels: &Vec<ChannelWithReplays>,
-    chat_logs: &Vec<ChatLog>,
+    channels: &[ChannelWithReplays],
+    chat_logs: &[ChatLog],
 ) -> Result<()> {
     // 채널 간 distance 계산
     utils::log("채널 간 거리 계산 중...");
@@ -170,7 +167,7 @@ fn run_channel_distance_analysis(
         "../web/public/related_channels.json",
         0.01,
         32,
-        &vec![
+        &[
             // 블랙리스트 채널들 (완전히 제외)
             "c5f1df85d73d9c613f0c27c0ef816857".to_string(),
         ],
@@ -180,24 +177,21 @@ fn run_channel_distance_analysis(
     utils::log(format!("계산된 채널 링크 수: {}", links.len()));
 
     // 채널별로 가장 가까운 채널 상위 5개 출력
-    // data::chat::print_top_closest_channels(&nodes, &links);
+    data::chat::print_top_closest_channels(&nodes, &links);
 
     Ok(())
 }
 
-fn run_cluster_similar_replays(channels: &Vec<ChannelWithReplays>, chat_logs: &Vec<ChatLog>) {
+fn run_cluster_similar_replays(channels: &[ChannelWithReplays], chat_logs: &[ChatLog]) {
     utils::log("유사한 다시보기 클러스터링 중 (시청자 수 기준)...");
     let clusters = data::chat::cluster_similar_replays(channels, chat_logs, 0.1);
     data::chat::print_replay_clusters(&clusters, Some(10000));
 }
 
 /// 비디오 연관도 분석 모드 실행
-fn run_find_related_replays(
-    channels: &Vec<ChannelWithReplays>,
-    chat_logs: &Vec<ChatLog>,
-) -> Result<()> {
+fn run_find_related_replays(channels: &[ChannelWithReplays], chat_logs: &[ChatLog]) -> Result<()> {
     // 모든 비디오 간 연관도 분석
-    let all_relations = data::video_analyzer::analyze_all_video_relations(&channels, &chat_logs)?;
+    let all_relations = data::video_analyzer::analyze_all_video_relations(channels, chat_logs)?;
 
     // JSON 파일로 저장
     data::video_analyzer::export_video_relations_json(
@@ -206,7 +200,7 @@ fn run_find_related_replays(
     )?;
 
     // 전체 분석 결과 요약 출력
-    // data::video_analyzer::print_all_video_relations(&all_relations, Some(20));
+    data::video_analyzer::print_all_video_relations(&all_relations, Some(20));
 
     Ok(())
 }
@@ -223,8 +217,8 @@ async fn run_experimental() -> Result<()> {
         .find(|chat_log| chat_log.video_id == 10066747)
         .unwrap();
 
-    let event = data::chat::detect_event_intervals(&first_chat).unwrap();
-    let event2 = data::chat::detect_event_intervals(&second_chat).unwrap();
+    let event = data::chat::detect_event_intervals(first_chat).unwrap();
+    let event2 = data::chat::detect_event_intervals(second_chat).unwrap();
     // data::chat::print_event_intervals(&event);
 
     data::chat::print_event_intervals(&event);
@@ -233,7 +227,7 @@ async fn run_experimental() -> Result<()> {
 
     data::chat::print_match_result(&result, &event, &event2);
 
-    let top_matched = result.matches.iter().next().unwrap();
+    let top_matched = result.matches.first().unwrap();
 
     print_matched_event_chats(top_matched, &event, &event2, first_chat, second_chat);
 

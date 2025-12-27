@@ -62,9 +62,7 @@ fn build_channel_user_map(
 
     for chat_log in chat_logs {
         if let Some(channel_id) = video_to_channel.get(&chat_log.video_id) {
-            let users = channel_users
-                .entry(channel_id.to_string())
-                .or_insert_with(HashSet::new);
+            let users = channel_users.entry(channel_id.to_string()).or_default();
 
             // 이 채팅 로그의 모든 고유 user_id 추가
             for message in &chat_log.messages {
@@ -378,4 +376,3 @@ pub fn print_top_closest_channels(nodes: &[ChannelNode], links: &[ChannelLink]) 
         println!();
     }
 }
-
