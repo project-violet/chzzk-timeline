@@ -38,6 +38,7 @@ export const CONTENT_FILTER_GROUPS = [
     { label: '리액트kr', group: '그룹', category: '', description: '', keywords: ['리액트kr'], tags: ['리액트kr'] },
     { label: '프로젝트아이', group: '그룹', category: '', description: '', keywords: ['프로젝트아이'], tags: ['프로젝트아이'] },
     { label: '에스더', group: '그룹', category: '', description: '', keywords: ['에스더'], tags: ['에스더'] },
+    { label: '그림프로덕션', group: '그룹', category: '', description: '', keywords: ['그림프로덕션'], tags: ['그림프로덕션'] },
 ];
 
 const NAV_OFFSET_REM = 6;
