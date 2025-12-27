@@ -21,3 +21,6 @@ rayon = "1"
 indicatif = "0.17"
 mimalloc = { version = "*" }
 ciborium = "0.2"
+
+[lints.clippy]
+empty_line_after_doc_comments = "allow"
