@@ -38,6 +38,10 @@ pub enum Opt {
     /// 이벤트 추출 모드
     #[structopt(name = "extract-event")]
     ExtractEvent(command::extract_event::ExtractEventOpt),
+
+    /// 인터렉티브 모드
+    #[structopt(name = "interactive")]
+    Interactive,
 }
 
 /// 채팅 분석 모드 옵션
@@ -46,6 +50,9 @@ pub struct AnalysisChatOpt {
     /// 채널 및 리플레이 데이터 파일 경로 (여러 개 지정 가능)
     #[structopt(long)]
     pub files: Vec<String>,
+
+    #[structopt(long)]
+    pub enable_experimental: bool,
 }
 
 /// ====== 엔트리포인트 ======
@@ -60,6 +67,7 @@ async fn main() -> Result<()> {
         Opt::AnalysisChat(opts) => run_analysis_chat(&opts).await?,
         Opt::Experimental => run_experimental().await?,
         Opt::ExtractEvent(opts) => command::extract_event::run_extract_event(&opts)?,
+        Opt::Interactive => command::interactive::run_interactive().await?,
     }
 
     Ok(())
@@ -91,14 +99,18 @@ async fn run_analysis_chat(opts: &AnalysisChatOpt) -> Result<()> {
     let chat_logs = data::chat::filter_chat_logs_by_user_count(chat_logs, 10000);
 
     // 각 채팅 로그 분석
-    // for chat_log in &chat_logs {
-    //     let analysis = data::chat::analyze_chat_log(chat_log);
-    //     data::chat::print_analysis_summary(chat_log, &analysis, &channels);
-    // }
+    if opts.enable_experimental {
+        for chat_log in &chat_logs {
+            let analysis = data::chat::analyze_chat_log(chat_log);
+            data::chat::print_analysis_summary(chat_log, &analysis, &channels);
+        }
+    }
 
     run_channel_distance_analysis(&channels, &chat_logs)?;
 
-    // run_cluster_similar_replays(&channels, &chat_logs);
+    if opts.enable_experimental {
+        run_cluster_similar_replays(&channels, &chat_logs);
+    }
 
     run_find_related_replays(&channels, &chat_logs)?;
 
@@ -200,7 +212,7 @@ fn run_find_related_replays(
 }
 
 async fn run_experimental() -> Result<()> {
-    let (channels, chat_logs) = load_channels_and_chat_logs(&AnalysisChatOpt::default())?;
+    let (_, chat_logs) = load_channels_and_chat_logs(&AnalysisChatOpt::default())?;
 
     let first_chat = chat_logs
         .iter()
@@ -223,7 +235,7 @@ async fn run_experimental() -> Result<()> {
 
     let top_matched = result.matches.iter().next().unwrap();
 
-    // print_matched_event_chats(top_matched, &event, &event2, first_chat, second_chat);
+    print_matched_event_chats(top_matched, &event, &event2, first_chat, second_chat);
 
     Ok(())
 }

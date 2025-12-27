@@ -3,12 +3,13 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
-use chrono::{DateTime, Duration, FixedOffset, NaiveDateTime, TimeZone};
+use chrono::{DateTime, Duration, FixedOffset};
 use color_eyre::eyre::{Context, Result};
 use rayon::prelude::*;
 use serde::Serialize;
 
 use crate::data::models::{ChannelWithReplays, ChatLog, Replay};
+use crate::data::utils::parse_replay_time;
 
 /// 비디오 연관도 정보
 #[derive(Debug, Clone, Serialize)]
@@ -26,45 +27,6 @@ pub struct VideoRelation {
 }
 
 /// Replay의 start/end 문자열을 DateTime으로 파싱합니다.
-fn parse_replay_time(time_str: &str) -> Result<DateTime<FixedOffset>> {
-    // ISO 8601 형식 또는 다른 형식 시도
-    // 예: "2024-11-10T10:00:00+09:00" 또는 "2024-11-10 10:00:00"
-
-    // 먼저 ISO 8601 형식 시도
-    if let Ok(dt) = DateTime::parse_from_rfc3339(time_str) {
-        return Ok(dt);
-    }
-
-    // RFC 3339 형식 시도 (Z 또는 +09:00 포함)
-    if let Ok(dt) = DateTime::parse_from_str(time_str, "%Y-%m-%dT%H:%M:%S%z") {
-        return Ok(dt);
-    }
-
-    // NaiveDateTime으로 파싱 후 KST(+09:00) 오프셋 적용
-    if let Ok(naive_dt) = NaiveDateTime::parse_from_str(time_str, "%Y-%m-%d %H:%M:%S") {
-        let kst_offset = FixedOffset::east_opt(9 * 3600)
-            .ok_or_else(|| color_eyre::eyre::eyre!("Invalid timezone offset"))?;
-        return Ok(kst_offset
-            .from_local_datetime(&naive_dt)
-            .single()
-            .ok_or_else(|| color_eyre::eyre::eyre!("Ambiguous local time"))?);
-    }
-
-    // ISO 형식 (공백 포함) 시도
-    if let Ok(naive_dt) = NaiveDateTime::parse_from_str(time_str, "%Y-%m-%dT%H:%M:%S") {
-        let kst_offset = FixedOffset::east_opt(9 * 3600)
-            .ok_or_else(|| color_eyre::eyre::eyre!("Invalid timezone offset"))?;
-        return Ok(kst_offset
-            .from_local_datetime(&naive_dt)
-            .single()
-            .ok_or_else(|| color_eyre::eyre::eyre!("Ambiguous local time"))?);
-    }
-
-    Err(color_eyre::eyre::eyre!(
-        "Failed to parse time string: {}",
-        time_str
-    ))
-}
 
 /// 두 시간 범위가 겹치는지 확인합니다.
 ///
