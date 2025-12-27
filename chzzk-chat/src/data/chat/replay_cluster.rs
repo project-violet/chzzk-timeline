@@ -254,4 +254,3 @@ pub fn print_replay_clusters(clusters: &[ReplayCluster], max_clusters: Option<us
         println!();
     }
 }
-

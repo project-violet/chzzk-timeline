@@ -230,4 +230,3 @@ mod tests {
         assert_eq!(msg.user_id, "f2959e925442442d133ed215d603786d");
     }
 }
-

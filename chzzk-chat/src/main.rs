@@ -1,6 +1,9 @@
+use std::fs;
+use std::io::Write;
+use std::path::Path;
 use std::time::Duration;
 
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{Context, Result};
 use mimalloc::MiMalloc;
 use structopt::StructOpt;
 use tokio::time;
@@ -8,6 +11,7 @@ use tokio::time;
 use crate::data::models::{ChannelWithReplays, ChatLog};
 
 mod api;
+mod command;
 mod data;
 mod utils;
 
@@ -30,6 +34,10 @@ pub enum Opt {
     /// 실험 모드
     #[structopt(name = "experimental")]
     Experimental,
+
+    /// 이벤트 추출 모드
+    #[structopt(name = "extract-event")]
+    ExtractEvent(command::extract_event::ExtractEventOpt),
 }
 
 /// 채팅 분석 모드 옵션
@@ -51,6 +59,7 @@ async fn main() -> Result<()> {
         Opt::LiveChatTest => run_live_chat_test().await?,
         Opt::AnalysisChat(opts) => run_analysis_chat(&opts).await?,
         Opt::Experimental => run_experimental().await?,
+        Opt::ExtractEvent(opts) => command::extract_event::run_extract_event(&opts)?,
     }
 
     Ok(())
@@ -97,7 +106,7 @@ async fn run_analysis_chat(opts: &AnalysisChatOpt) -> Result<()> {
     std::process::exit(0);
 }
 
-fn load_channels_and_chat_logs(
+pub fn load_channels_and_chat_logs(
     opts: &AnalysisChatOpt,
 ) -> Result<(
     Vec<data::models::ChannelWithReplays>,
@@ -202,5 +211,102 @@ async fn run_experimental() -> Result<()> {
         .find(|chat_log| chat_log.video_id == 10066747)
         .unwrap();
 
+    let event = data::chat::detect_event_intervals(&first_chat).unwrap();
+    let event2 = data::chat::detect_event_intervals(&second_chat).unwrap();
+    // data::chat::print_event_intervals(&event);
+
+    data::chat::print_event_intervals(&event);
+
+    let result = data::chat::match_events_time_only(&event, &event2);
+
+    data::chat::print_match_result(&result, &event, &event2);
+
+    let top_matched = result.matches.iter().next().unwrap();
+
+    // print_matched_event_chats(top_matched, &event, &event2, first_chat, second_chat);
+
     Ok(())
+}
+
+/// 매칭된 이벤트 구간의 채팅을 타임스탬프와 함께 출력합니다.
+fn print_matched_event_chats(
+    matched: &data::chat::MatchedEvent,
+    event_a: &data::chat::EventDetectionResult,
+    event_b: &data::chat::EventDetectionResult,
+    chat_a: &ChatLog,
+    chat_b: &ChatLog,
+) {
+    println!("\n=== 매칭된 이벤트 구간의 채팅 ===");
+
+    // A 이벤트 구간 (first_chat)
+    let a_event = &event_a.events[matched.a_idx];
+    let a_start_abs = event_a.first_message_time.timestamp() + a_event.start_sec;
+    let a_end_abs = event_a.first_message_time.timestamp() + a_event.end_sec;
+
+    println!("\n[A 채팅 (Video ID: {})]", chat_a.video_id);
+    println!(
+        "구간: {} ~ {}",
+        event_a.first_message_time.format("%Y-%m-%d %H:%M:%S"),
+        (event_a.first_message_time + chrono::Duration::seconds(a_event.end_sec))
+            .format("%Y-%m-%d %H:%M:%S")
+    );
+
+    let mut a_messages: Vec<_> = chat_a
+        .messages
+        .iter()
+        .filter(|msg| {
+            let msg_timestamp = msg.timestamp.timestamp();
+            msg_timestamp >= a_start_abs && msg_timestamp <= a_end_abs
+        })
+        .collect();
+
+    // 시간 순으로 정렬
+    a_messages.sort_by_key(|msg| msg.timestamp);
+
+    for msg in a_messages.iter().take(1000) {
+        // 상위 50개만 출력
+        println!(
+            "[{}] {}: {}",
+            msg.timestamp.format("%H:%M:%S"),
+            msg.nickname,
+            msg.message
+        );
+    }
+    println!("... (총 {}개 메시지)", a_messages.len());
+
+    // B 이벤트 구간 (second_chat)
+    let b_event = &event_b.events[matched.b_idx];
+    let b_start_abs = event_b.first_message_time.timestamp() + b_event.start_sec;
+    let b_end_abs = event_b.first_message_time.timestamp() + b_event.end_sec;
+
+    println!("\n[B 채팅 (Video ID: {})]", chat_b.video_id);
+    println!(
+        "구간: {} ~ {}",
+        event_b.first_message_time.format("%Y-%m-%d %H:%M:%S"),
+        (event_b.first_message_time + chrono::Duration::seconds(b_event.end_sec))
+            .format("%Y-%m-%d %H:%M:%S")
+    );
+
+    let mut b_messages: Vec<_> = chat_b
+        .messages
+        .iter()
+        .filter(|msg| {
+            let msg_timestamp = msg.timestamp.timestamp();
+            msg_timestamp >= b_start_abs && msg_timestamp <= b_end_abs
+        })
+        .collect();
+
+    // 시간 순으로 정렬
+    b_messages.sort_by_key(|msg| msg.timestamp);
+
+    for msg in b_messages.iter().take(1000) {
+        // 상위 50개만 출력
+        println!(
+            "[{}] {}: {}",
+            msg.timestamp.format("%H:%M:%S"),
+            msg.nickname,
+            msg.message
+        );
+    }
+    println!("... (총 {}개 메시지)", b_messages.len());
 }
