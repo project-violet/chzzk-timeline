@@ -1,11 +1,15 @@
 # litellm_peak_summarize.py
 # ------------------------------------------------------------
-# pip install -U litellm python-dotenv
+# pip install -U litellm python-dotenv tqdm
 #
 # 예)
 #   python litellm_peak_summarize.py --input chat_a.log --engine gemini2
 #   python litellm_peak_summarize.py --input chat_a.log --suite all
 #   python litellm_peak_summarize.py --input chat_a.log --models openai/gpt-5.2 gemini/gemini-2.0-flash groq/llama-3.3-70b-versatile xai/grok-4-1-fast-non-reasoning
+#
+# 폴더 처리 (병렬 처리, progress bar 지원)
+#   python litellm_peak_summarize.py --input ./chat_folder --engine gemini2
+#   python litellm_peak_summarize.py --input ./chat_folder --engine gemini2 --file_workers 12
 #
 # 노이즈 제거 옵션(추천)
 #   python litellm_peak_summarize.py --input chat_a.log --suite fast --denoise --dedup_run_min 3
@@ -17,8 +21,15 @@ import os
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any
 
 from dotenv import load_dotenv
+
+try:
+    from tqdm import tqdm
+except ImportError:
+    # tqdm이 없으면 기본 print 사용
+    tqdm = None
 
 TS_PREFIX_RE = re.compile(r"^\[\d{2}:\d{2}:\d{2}\]\s*:\s*")
 
@@ -130,7 +141,7 @@ def build_messages(chat_text: str) -> list[dict]:
         "2) 그 근거를 바탕으로 '무슨 일이 벌어졌는지'를 한 문장으로 SUMMARY에 작성\n"
         "3) 같은 내용을 유튜브 쇼츠 제목처럼 더 짧게 TITLE에 작성\n"
         "제약:\n"
-        "- TITLE: 18자 이내, 한국어, 느낌표/물음표 1개까지만, 따옴표 금지\n"
+        "- TITLE: 30자 이내, 한국어\n"
         "- SUMMARY: 구체적 상황(무엇/왜/어떻게)을 담고, EVIDENCE 중 최소 1개 표현을 포함\n"
         "- TITLE/SUMMARY에 '채팅', '로그', '요약', '분석', '모델', '입력', '출력' 같은 메타 단어 금지\n"
         "- 형식은 반드시 아래 3줄만 (다른 줄/부연설명 금지)\n"
@@ -244,8 +255,8 @@ def process_file(
     do_denoise: bool,
     dedup_run_min: int,
     max_lines: int,
-):
-    """단일 파일을 처리하고 LLM을 실행하여 결과를 출력"""
+) -> dict[str, Any]:
+    """단일 파일을 처리하고 LLM을 실행하여 결과를 반환"""
     raw_text = open(input_path, "r", encoding="utf-8").read()
     cleaned = strip_timestamps(raw_text)
 
@@ -284,11 +295,22 @@ def process_file(
             except Exception as e:
                 results.append({"model": futs[fut], "error": repr(e)})
 
-    # 출력
-    for r in sorted(
-        results, key=lambda x: (x.get("error") is not None, x.get("latency_ms") or 1e18)
-    ):
-        print("=" * 80)
+    return {
+        "filename": os.path.basename(input_path),
+        "filepath": input_path,
+        "results": sorted(
+            results,
+            key=lambda x: (x.get("error") is not None, x.get("latency_ms") or 1e18),
+        ),
+    }
+
+
+def print_file_results(file_result: dict[str, Any]):
+    """파일 처리 결과를 출력"""
+    print("=" * 80)
+    print(f"FILE: {file_result['filename']}")
+    for r in file_result["results"]:
+        print()
         print(f"MODEL: {r.get('model')}")
         if r.get("error"):
             print(f"ERROR: {r['error']}")
@@ -297,6 +319,7 @@ def process_file(
             f"LATENCY: {r['latency_ms']:.1f}ms | TOKENS: prompt={r.get('prompt_tokens')} completion={r.get('completion_tokens')} total={r.get('total_tokens')}"
         )
         print(r.get("text", ""))
+    print()
 
 
 def main():
@@ -363,6 +386,12 @@ def main():
         default=0,
         help="(선택) 전처리 후 최대 줄 수(0이면 제한 없음). 초과 시 마지막 N줄만 유지",
     )
+    ap.add_argument(
+        "--file_workers",
+        type=int,
+        default=12,
+        help="폴더 처리 시 동시에 처리할 파일 수 (기본 12)",
+    )
 
     args = ap.parse_args()
 
@@ -397,7 +426,7 @@ def main():
     input_path = args.input
     if os.path.isfile(input_path):
         # 단일 파일 처리
-        process_file(
+        file_result = process_file(
             input_path,
             models,
             args.max_tokens,
@@ -410,6 +439,7 @@ def main():
             args.dedup_run_min,
             args.max_lines,
         )
+        print_file_results(file_result)
     elif os.path.isdir(input_path):
         # 폴더인 경우 파일명 순으로 정렬하여 각 파일 처리
         file_list = [
@@ -423,11 +453,23 @@ def main():
             print(f"경고: 폴더 '{input_path}'에 파일이 없습니다.")
             return
 
-        for idx, filename in enumerate(file_list, 1):
-            file_path = os.path.join(input_path, filename)
-            print()
-            print(f"# 파일 {idx}/{len(file_list)}: {filename}")
-            process_file(
+        # 병렬로 파일 처리
+        file_paths = [os.path.join(input_path, f) for f in file_list]
+        file_results = []
+
+        # progress bar 설정
+        pbar_kwargs = {
+            "total": len(file_paths),
+            "desc": "파일 처리",
+            "unit": "파일",
+        }
+        if tqdm:
+            pbar = tqdm(**pbar_kwargs)
+        else:
+            pbar = None
+
+        def process_single_file(file_path: str) -> dict[str, Any]:
+            result = process_file(
                 file_path,
                 models,
                 args.max_tokens,
@@ -440,6 +482,35 @@ def main():
                 args.dedup_run_min,
                 args.max_lines,
             )
+            if pbar:
+                pbar.update(1)
+                pbar.set_postfix({"현재": os.path.basename(file_path)})
+            return result
+
+        with ThreadPoolExecutor(max_workers=max(1, args.file_workers)) as ex:
+            futures = {ex.submit(process_single_file, fp): fp for fp in file_paths}
+            for fut in as_completed(futures):
+                try:
+                    file_results.append(fut.result())
+                except Exception as e:
+                    file_path = futures[fut]
+                    file_results.append(
+                        {
+                            "filename": os.path.basename(file_path),
+                            "filepath": file_path,
+                            "results": [{"error": repr(e)}],
+                        }
+                    )
+
+        if pbar:
+            pbar.close()
+
+        # 파일명 순으로 결과 정렬 (원래 순서 유지)
+        file_results.sort(key=lambda x: x["filename"])
+
+        # 결과 출력
+        for file_result in file_results:
+            print_file_results(file_result)
     else:
         print(f"오류: '{input_path}'는 유효한 파일 또는 폴더가 아닙니다.")
         return
