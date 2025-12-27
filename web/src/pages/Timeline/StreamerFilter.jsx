@@ -11,6 +11,7 @@ import { hangulToKeystrokes, levenshteinDistance } from '../../utils/hangul';
 // keywords: 제목에서 검색할 키워드 배열
 // tags: 태그에서 검색할 태그 배열
 export const CONTENT_FILTER_GROUPS = [
+    { label: '멋사 공책 RPG', group: '스트리머 서버', category: '마인크래프트', description: '', keywords: ['멋사 공책', '멋사공책', '멋사 공책 RPG'], tags: ['멋사공책RPG'] },
     { label: '큰별수양관', group: '스트리머 서버', category: '마인크래프트', description: '', keywords: ['큰별', '큰별수양관'], tags: ['큰별수양관'] },
     { label: '쿠롬이네 민박집', group: '스트리머 서버', category: '마인크래프트', description: '', keywords: ['쿠롬님 서버', '쿠롬이네', '민박집'], tags: [] },
     { label: '봉부락', group: '스트리머 서버', category: '마인크래프트', description: '', keywords: ['봉부락'], tags: ['봉부락'] },
