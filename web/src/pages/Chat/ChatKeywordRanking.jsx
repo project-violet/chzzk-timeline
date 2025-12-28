@@ -14,6 +14,11 @@ export const ChatKeywordRanking = ({ chatLogText, chatLogLoading, onKeywordClick
         }
     }, [chatLogText]);
 
+    // 로딩 중이 아니고 키워드가 없으면 컴포넌트를 렌더링하지 않음
+    if (!chatLogLoading && (!keywords || keywords.length === 0)) {
+        return null;
+    }
+
     return (
         <div>
             <Text size="sm" c="dimmed" fw={600} mb={4} className="uppercase tracking-wide">
