@@ -14,9 +14,14 @@
 # 노이즈 제거 옵션(추천)
 #   python litellm_peak_summarize.py --input chat_a.log --suite fast --denoise --dedup_run_min 3
 #   python litellm_peak_summarize.py --input chat_a.log --engine groq_70b --no_denoise
+#
+# JSON 파일 모드 (extract_event.rs가 생성한 JSON 파일 처리)
+#   python llm-chat-event.py --json --input 10307278_chat.json --engine gemini2
+#   python llm-chat-event.py --json --input 10307278_chat.json --engine gemini25 --denoise
 # ------------------------------------------------------------
 
 import argparse
+import json
 import os
 import re
 import time
@@ -328,6 +333,200 @@ def print_file_results(file_result: dict[str, Any]):
     print()
 
 
+def parse_llm_output(text: str) -> dict[str, str] | None:
+    """LLM 출력에서 EVIDENCE, SUMMARY, TITLE을 파싱"""
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    result = {}
+
+    for line in lines:
+        if line.startswith("EVIDENCE:"):
+            result["evidence"] = line[9:].strip()
+        elif line.startswith("SUMMARY:"):
+            result["summary"] = line[8:].strip()
+        elif line.startswith("TITLE:"):
+            result["title"] = line[6:].strip()
+
+    if len(result) == 3:
+        return result
+    return None
+
+
+def prepare_chat_text_from_lines(
+    lines: list[str],
+    do_denoise: bool,
+    dedup_run_min: int,
+    max_lines: int,
+) -> str:
+    """메시지 라인들을 전처리하여 채팅 텍스트로 변환 (기존 process_file 로직 재사용)"""
+    if do_denoise:
+        lines = preprocess_chat_lines(lines, dedup_run_min=max(2, dedup_run_min))
+    else:
+        lines = [ln.strip() for ln in lines if ln.strip()]
+
+    if max_lines and max_lines > 0 and len(lines) > max_lines:
+        lines = lines[-max_lines:]
+
+    return "\n".join(lines)
+
+
+def run_parallel_with_progress(
+    items: list,
+    process_func,
+    desc: str,
+    unit: str,
+    max_workers: int,
+) -> list:
+    """병렬 실행 래퍼 (progress bar 포함, 순서 유지)"""
+    pbar_kwargs = {
+        "total": len(items),
+        "desc": desc,
+        "unit": unit,
+    }
+    if tqdm:
+        pbar = tqdm(**pbar_kwargs)
+    else:
+        pbar = None
+
+    def process_with_progress(item):
+        try:
+            result = process_func(item)
+            if pbar:
+                pbar.update(1)
+            return result
+        except Exception as e:
+            if pbar:
+                pbar.update(1)
+            raise
+
+    # 순서 유지 (인덱스 기반)
+    results = [None] * len(items)
+    with ThreadPoolExecutor(max_workers=max(1, max_workers)) as ex:
+        futures = {
+            ex.submit(process_with_progress, item): idx
+            for idx, item in enumerate(items)
+        }
+        for fut in as_completed(futures):
+            try:
+                result = fut.result()
+                idx = futures[fut]
+                results[idx] = result
+            except Exception as e:
+                idx = futures[fut]
+                print(f"경고: 항목 #{idx + 1} 처리 중 오류 발생: {repr(e)}")
+                results[idx] = None
+    if pbar:
+        pbar.close()
+    return results
+
+
+def process_json_file(
+    json_path: str,
+    model: str,
+    max_tokens: int,
+    temperature: float,
+    timeout_s: float,
+    reasoning: str | None,
+    retry_on_bad_format: bool,
+    do_denoise: bool,
+    dedup_run_min: int,
+    max_lines: int,
+    threads: int,
+) -> dict[str, Any]:
+    """JSON 파일을 읽어서 각 이벤트를 병렬로 요약하고 summary JSON 생성"""
+    # JSON 파일 읽기
+    with open(json_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    video_id = data["video_id"]
+    first_message_time = data["first_message_time"]
+    events = data["events"]
+
+    def process_event(idx_and_event: tuple[int, dict]) -> tuple[int, dict]:
+        """단일 이벤트를 처리하여 evidence, summary, title 추출"""
+        event_idx, event_data = idx_and_event
+        event = event_data["event"]
+        messages = event_data["messages"]  # Vec<String>
+
+        # 메시지 전처리 (기존 함수 재사용)
+        lines = [msg.strip() for msg in messages if msg.strip()]
+        chat_text = prepare_chat_text_from_lines(
+            lines, do_denoise, dedup_run_min, max_lines
+        )
+
+        # LLM 요약 (기존 함수 재사용)
+        llm_messages = build_messages(chat_text)
+        result = run_model(
+            model,
+            llm_messages,
+            max_tokens,
+            temperature,
+            timeout_s,
+            reasoning,
+            retry_on_bad_format,
+        )
+
+        if result.get("error"):
+            parsed = {"evidence": "", "summary": "", "title": ""}
+        else:
+            parsed = parse_llm_output(result["text"])
+            if not parsed:
+                parsed = {"evidence": "", "summary": "", "title": ""}
+
+        return event_idx, {
+            "event": event,
+            "evidence": parsed["evidence"],
+            "summary": parsed["summary"],
+            "title": parsed["title"],
+        }
+
+    # 병렬 실행 (순서 유지)
+    items = [(idx, event_data) for idx, event_data in enumerate(events)]
+    results = run_parallel_with_progress(
+        items,
+        process_event,
+        f"이벤트 처리 ({os.path.basename(json_path)})",
+        "이벤트",
+        threads,
+    )
+
+    # 결과를 딕셔너리로 변환 및 빈 값 처리
+    processed_events = []
+    for idx, result in enumerate(results):
+        if result is None:
+            # 오류 발생 시 빈 값으로 채움
+            processed_events.append(
+                {
+                    "event": events[idx]["event"],
+                    "evidence": "",
+                    "summary": "",
+                    "title": "",
+                }
+            )
+        else:
+            _, event_result = result
+            processed_events.append(event_result)
+
+    output_data = {
+        "video_id": video_id,
+        "first_message_time": first_message_time,
+        "events": processed_events,
+    }
+
+    # 출력 파일명 생성
+    base_name = os.path.splitext(json_path)[0]
+    output_path = base_name + "_summary.json"
+
+    # JSON 파일로 저장
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(output_data, f, ensure_ascii=False)
+
+    return {
+        "input_path": json_path,
+        "output_path": output_path,
+        "events_processed": len(processed_events),
+    }
+
+
 def main():
     load_dotenv()
 
@@ -346,7 +545,14 @@ def main():
     }
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--input", required=True, help="원본 채팅 txt 파일 또는 폴더 경로")
+    ap.add_argument(
+        "--input", required=True, help="원본 채팅 txt 파일, 폴더 경로, 또는 JSON 파일"
+    )
+    ap.add_argument(
+        "--json",
+        action="store_true",
+        help="JSON 파일 모드 (extract_event.rs가 생성한 JSON 파일 처리)",
+    )
     ap.add_argument(
         "--engine", default=None, choices=sorted(engines.keys()), help="프리셋 엔진"
     )
@@ -359,7 +565,7 @@ def main():
     ap.add_argument(
         "--suite", default=None, choices=["all", "fast"], help="여러 모델 한번에"
     )
-    ap.add_argument("--threads", type=int, default=4, help="동시 호출 개수(병렬)")
+    ap.add_argument("--threads", type=int, default=12, help="동시 호출 개수(병렬)")
     ap.add_argument("--max_tokens", type=int, default=256)
     ap.add_argument("--temperature", type=float, default=0.2)
     ap.add_argument("--timeout", type=float, default=60.0)
@@ -428,6 +634,50 @@ def main():
             engines["gpt52"],
         ]
 
+    # JSON 모드 처리
+    if args.json:
+        if not os.path.isfile(args.input):
+            print(f"오류: '{args.input}'는 유효한 파일이 아닙니다.")
+            return
+
+        if not args.input.endswith(".json"):
+            print(f"오류: JSON 모드에서는 .json 파일이 필요합니다.")
+            return
+
+        # 모델 선택 (JSON 모드에서는 단일 모델만 사용)
+        if args.models:
+            model = args.models[0]
+        elif args.engine:
+            model = engines[args.engine]
+        elif args.suite == "fast":
+            model = engines["gemini2"]
+        else:
+            model = engines["gemini25"]
+
+        # 기본 denoise 설정
+        do_denoise = True
+        if args.no_denoise:
+            do_denoise = False
+        if args.denoise:
+            do_denoise = True
+
+        result = process_json_file(
+            args.input,
+            model,
+            args.max_tokens,
+            args.temperature,
+            args.timeout,
+            args.reasoning,
+            args.retry_on_bad_format,
+            do_denoise,
+            args.dedup_run_min,
+            args.max_lines,
+            args.threads,
+        )
+        print(f"처리 완료: {result['input_path']} -> {result['output_path']}")
+        print(f"처리된 이벤트 수: {result['events_processed']}")
+        return
+
     # 입력이 파일인지 폴더인지 확인
     input_path = args.input
     if os.path.isfile(input_path):
@@ -461,21 +711,9 @@ def main():
 
         # 병렬로 파일 처리
         file_paths = [os.path.join(input_path, f) for f in file_list]
-        file_results = []
-
-        # progress bar 설정
-        pbar_kwargs = {
-            "total": len(file_paths),
-            "desc": "파일 처리",
-            "unit": "파일",
-        }
-        if tqdm:
-            pbar = tqdm(**pbar_kwargs)
-        else:
-            pbar = None
 
         def process_single_file(file_path: str) -> dict[str, Any]:
-            result = process_file(
+            return process_file(
                 file_path,
                 models,
                 args.max_tokens,
@@ -488,31 +726,33 @@ def main():
                 args.dedup_run_min,
                 args.max_lines,
             )
-            if pbar:
-                pbar.update(1)
-                pbar.set_postfix({"현재": os.path.basename(file_path)})
-            return result
 
-        with ThreadPoolExecutor(max_workers=max(1, args.file_workers)) as ex:
-            futures = {ex.submit(process_single_file, fp): fp for fp in file_paths}
-            for fut in as_completed(futures):
-                try:
-                    file_results.append(fut.result())
-                except Exception as e:
-                    file_path = futures[fut]
-                    file_results.append(
-                        {
-                            "filename": os.path.basename(file_path),
-                            "filepath": file_path,
-                            "results": [{"error": repr(e)}],
-                        }
-                    )
+        file_results = run_parallel_with_progress(
+            file_paths,
+            process_single_file,
+            "파일 처리",
+            "파일",
+            args.file_workers,
+        )
 
-        if pbar:
-            pbar.close()
+        # 에러 처리 및 파일명 순으로 정렬
+        processed_results = []
+        for i, result in enumerate(file_results):
+            if result is None:
+                file_path = file_paths[i]
+                processed_results.append(
+                    {
+                        "filename": os.path.basename(file_path),
+                        "filepath": file_path,
+                        "results": [{"error": "처리 중 오류 발생"}],
+                    }
+                )
+            else:
+                processed_results.append(result)
 
-        # 파일명 순으로 결과 정렬 (원래 순서 유지)
-        file_results.sort(key=lambda x: x["filename"])
+        # 파일명 순으로 결과 정렬
+        processed_results.sort(key=lambda x: x["filename"])
+        file_results = processed_results
 
         # 결과 출력
         for file_result in file_results:
