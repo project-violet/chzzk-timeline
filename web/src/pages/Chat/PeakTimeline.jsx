@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Text, Stack, ScrollArea, Loader, Center, Badge, Paper, Tooltip } from '@mantine/core';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Text, Stack, ScrollArea, Loader, Center, Badge, Paper, Tooltip, SegmentedControl } from '@mantine/core';
 
-const EventItem = ({ event, index, formatSeconds }) => {
+const EventItem = ({ event, index, originalIndex, formatSeconds }) => {
     const [isHovered, setIsHovered] = useState(false);
 
     return (
@@ -24,7 +24,7 @@ const EventItem = ({ event, index, formatSeconds }) => {
                             color={event.event.peak_z_score > 15 ? 'red' : event.event.peak_z_score > 10 ? 'orange' : 'teal'}
                             className="flex-shrink-0"
                         >
-                            {index + 1}
+                            {originalIndex + 1}
                         </Badge>
                         {event.title && (
                             <Text
@@ -67,6 +67,7 @@ export const PeakTimeline = ({ videoId }) => {
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [sortMode, setSortMode] = useState('default');
 
     useEffect(() => {
         if (!videoId) {
@@ -121,15 +122,50 @@ export const PeakTimeline = ({ videoId }) => {
         return `${minutes}:${secs.toString().padStart(2, '0')}`;
     };
 
+    const sortedEvents = useMemo(() => {
+        if (!events || events.length === 0) return [];
+        
+        // 기본 정렬: 원래 인덱스를 함께 저장
+        const eventsWithIndex = events.map((event, index) => ({
+            ...event,
+            originalIndex: index,
+        }));
+        
+        switch (sortMode) {
+            case 'zscore':
+                return [...eventsWithIndex].sort((a, b) => b.event.peak_z_score - a.event.peak_z_score);
+            case 'peak':
+                return [...eventsWithIndex].sort((a, b) => b.event.peak_count - a.event.peak_count);
+            case 'default':
+            default:
+                return eventsWithIndex;
+        }
+    }, [events, sortMode]);
+
     if (!videoId) {
         return null;
     }
 
     return (
         <div>
-            <Text size="sm" c="dimmed" fw={600} mb={4} className="uppercase tracking-wide">
-                피크 타임라인
-            </Text>
+            <div className="flex items-center justify-between mb-4">
+                <Text size="sm" c="dimmed" fw={600} className="uppercase tracking-wide">
+                    피크 타임라인
+                </Text>
+                {!loading && !error && events && events.length > 0 && (
+                    <SegmentedControl
+                        size="xs"
+                        value={sortMode}
+                        onChange={setSortMode}
+                        data={[
+                            { label: '기본', value: 'default' },
+                            { label: 'Z-score', value: 'zscore' },
+                            { label: 'Peak', value: 'peak' },
+                        ]}
+                        className="flex-shrink-0"
+                    />
+                )}
+            </div>
             <div style={{ height: '800px' }}>
                 {loading ? (
                     <Center h="100%">
@@ -141,14 +177,15 @@ export const PeakTimeline = ({ videoId }) => {
                             데이터를 불러올 수 없습니다
                         </Text>
                     </Center>
-                ) : events && events.length > 0 ? (
+                ) : sortedEvents && sortedEvents.length > 0 ? (
                     <ScrollArea h="100%" type="auto" offsetScrollbars>
                         <Stack gap={8}>
-                            {events.map((event, index) => (
+                            {sortedEvents.map((event, index) => (
                                 <EventItem
-                                    key={index}
+                                    key={event.originalIndex ?? index}
                                     event={event}
                                     index={index}
+                                    originalIndex={event.originalIndex ?? index}
                                     formatSeconds={formatSeconds}
                                 />
                             ))}
