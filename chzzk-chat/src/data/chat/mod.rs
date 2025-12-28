@@ -12,6 +12,6 @@ pub use channel_distance::{
 };
 pub use event::{
     detect_event_intervals, match_events_time_only, print_event_intervals, print_match_result,
-    EventDetectionResult, MatchedEvent,
+    EventDetectionResult, EventInterval, MatchedEvent,
 };
 pub use replay_cluster::{cluster_similar_replays, print_replay_clusters};
