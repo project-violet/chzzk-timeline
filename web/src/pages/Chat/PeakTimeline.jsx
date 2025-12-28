@@ -1,6 +1,68 @@
 import React, { useEffect, useState } from 'react';
 import { Text, Stack, ScrollArea, Loader, Center, Badge, Paper, Tooltip } from '@mantine/core';
 
+const EventItem = ({ event, index, formatSeconds }) => {
+    const [isHovered, setIsHovered] = useState(false);
+
+    return (
+        <div
+            style={{
+                backgroundColor: isHovered ? 'rgba(51, 65, 85, 0.4)' : 'rgba(30, 41, 59, 0.3)',
+                borderColor: 'rgba(71, 85, 105, 0.5)',
+            }}
+            className="border rounded-lg p-3 transition-colors cursor-pointer"
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
+            <Stack gap={4}>
+                <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <Badge
+                            size="sm"
+                            radius="md"
+                            variant="light"
+                            color={event.event.peak_z_score > 15 ? 'red' : event.event.peak_z_score > 10 ? 'orange' : 'teal'}
+                            className="flex-shrink-0"
+                        >
+                            {index + 1}
+                        </Badge>
+                        {event.title && (
+                            <Text
+                                size="sm"
+                                fw={600}
+                                className="text-slate-200 truncate"
+                                title={event.title}
+                            >
+                                {event.title}
+                            </Text>
+                        )}
+                    </div>
+                    <Tooltip label={`${formatSeconds(event.event.start_sec)} - ${formatSeconds(event.event.end_sec)}`}>
+                        <Badge size="xs" variant="outline" color="gray" className="flex-shrink-0">
+                            {formatSeconds(event.event.peak_sec)}
+                        </Badge>
+                    </Tooltip>
+                </div>
+                
+                {event.summary && (
+                    <Text size="xs" c="dimmed" className="text-slate-300 line-clamp-2">
+                        {event.summary}
+                    </Text>
+                )}
+                
+                <div className="flex items-center gap-2 mt-1">
+                    <Badge size="xs" variant="dot" color="cyan">
+                        Z-score: {event.event.peak_z_score.toFixed(1)}
+                    </Badge>
+                    <Badge size="xs" variant="dot" color="blue">
+                        Peak: {event.event.peak_count}
+                    </Badge>
+                </div>
+            </Stack>
+        </div>
+    );
+};
+
 export const PeakTimeline = ({ videoId }) => {
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -83,57 +145,12 @@ export const PeakTimeline = ({ videoId }) => {
                     <ScrollArea h="100%" type="auto" offsetScrollbars>
                         <Stack gap={8}>
                             {events.map((event, index) => (
-                                <Paper
+                                <EventItem
                                     key={index}
-                                    p="sm"
-                                    className="border border-slate-700/50 bg-slate-800/30 hover:bg-slate-800/50 transition-colors rounded-lg"
-                                >
-                                    <Stack gap={4}>
-                                        <div className="flex items-center justify-between gap-2">
-                                            <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                <Badge
-                                                    size="sm"
-                                                    radius="md"
-                                                    variant="light"
-                                                    color={event.event.peak_z_score > 15 ? 'red' : event.event.peak_z_score > 10 ? 'orange' : 'teal'}
-                                                    className="flex-shrink-0"
-                                                >
-                                                    {index + 1}
-                                                </Badge>
-                                                {event.title && (
-                                                    <Text
-                                                        size="sm"
-                                                        fw={600}
-                                                        className="text-slate-200 truncate"
-                                                        title={event.title}
-                                                    >
-                                                        {event.title}
-                                                    </Text>
-                                                )}
-                                            </div>
-                                            <Tooltip label={`${formatSeconds(event.event.start_sec)} - ${formatSeconds(event.event.end_sec)}`}>
-                                                <Badge size="xs" variant="outline" color="gray" className="flex-shrink-0">
-                                                    {formatSeconds(event.event.peak_sec)}
-                                                </Badge>
-                                            </Tooltip>
-                                        </div>
-                                        
-                                        {event.summary && (
-                                            <Text size="xs" c="dimmed" className="text-slate-300 line-clamp-2">
-                                                {event.summary}
-                                            </Text>
-                                        )}
-                                        
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <Badge size="xs" variant="dot" color="cyan">
-                                                Z-score: {event.event.peak_z_score.toFixed(1)}
-                                            </Badge>
-                                            <Badge size="xs" variant="dot" color="blue">
-                                                Peak: {event.event.peak_count}
-                                            </Badge>
-                                        </div>
-                                    </Stack>
-                                </Paper>
+                                    event={event}
+                                    index={index}
+                                    formatSeconds={formatSeconds}
+                                />
                             ))}
                         </Stack>
                     </ScrollArea>
