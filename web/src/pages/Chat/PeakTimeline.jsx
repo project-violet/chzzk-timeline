@@ -1,8 +1,14 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Text, Stack, ScrollArea, Loader, Center, Badge, Paper, Tooltip, SegmentedControl } from '@mantine/core';
 
-const EventItem = ({ event, index, originalIndex, formatSeconds }) => {
+const EventItem = ({ event, index, originalIndex, formatSeconds, onDoubleClick }) => {
     const [isHovered, setIsHovered] = useState(false);
+
+    const handleDoubleClick = () => {
+        if (onDoubleClick) {
+            onDoubleClick({ time: event.event.start_sec });
+        }
+    };
 
     return (
         <div
@@ -13,6 +19,7 @@ const EventItem = ({ event, index, originalIndex, formatSeconds }) => {
             className="border rounded-lg p-3 transition-colors cursor-pointer"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
+            onDoubleClick={handleDoubleClick}
         >
             <Stack gap={4}>
                 <div className="flex items-center justify-between gap-2">
@@ -63,7 +70,7 @@ const EventItem = ({ event, index, originalIndex, formatSeconds }) => {
     );
 };
 
-export const PeakTimeline = ({ videoId }) => {
+export const PeakTimeline = ({ videoId, onTimelinePointDoubleClick }) => {
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -187,6 +194,7 @@ export const PeakTimeline = ({ videoId }) => {
                                     index={index}
                                     originalIndex={event.originalIndex ?? index}
                                     formatSeconds={formatSeconds}
+                                    onDoubleClick={onTimelinePointDoubleClick}
                                 />
                             ))}
                         </Stack>

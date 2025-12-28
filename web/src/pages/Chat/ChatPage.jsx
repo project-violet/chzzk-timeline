@@ -429,7 +429,7 @@ const ChatPage = () => {
                             {isMobile ? (
                                 <>
                                     <div className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40">
-                                        <PeakTimeline videoId={videoId} />
+                                        <PeakTimeline videoId={videoId} onTimelinePointDoubleClick={handleTimelinePointDoubleClick} />
                                     </div>
 
                                     {hasKeywords && (
@@ -471,7 +471,7 @@ const ChatPage = () => {
                     {!isMobile && (
                         <div className="lg:sticky lg:top-28">
                             <div className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40">
-                                <PeakTimeline videoId={videoId} />
+                                <PeakTimeline videoId={videoId} onTimelinePointDoubleClick={handleTimelinePointDoubleClick} />
                             </div>
 
                             {hasKeywords && (
