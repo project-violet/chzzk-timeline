@@ -38,6 +38,9 @@ except ImportError:
 
 TS_PREFIX_RE = re.compile(r"^\[\d{2}:\d{2}:\d{2}\]\s*:\s*")
 
+# 이모티콘 패턴: {:...:} 형식 (예: {:tmRainbowdance:}, {:d_41:})
+EMOTICON_RE = re.compile(r"\{:[^}]+\}")
+
 
 # -------------------------
 # Noise reduction (chat)
@@ -72,23 +75,36 @@ def compress_repeats(s: str) -> str:
     return out
 
 
+def remove_emoticons(s: str) -> str:
+    """이모티콘 {:...:} 형식을 제거"""
+    return EMOTICON_RE.sub("", s).strip()
+
+
 def is_noise_only_line(s: str) -> bool:
     # 공백 제거 후 노이즈인지 판단(예: "ㅋㅋㅋㅋ ㅋ" 같은 것도 제거)
     normalized = re.sub(r"\s+", "", s)
     return bool(ONLY_NOISE_RE.match(normalized))
 
 
-def preprocess_chat_lines(lines: list[str], dedup_run_min: int = 3) -> list[str]:
+def preprocess_chat_lines(
+    lines: list[str], dedup_run_min: int = 3, remove_emoticons_flag: bool = True
+) -> list[str]:
     """
-    1) 줄 전체가 웃음/감탄/기호 등 '노이즈만'이면 제거
-    2) 줄 내부 반복(ㅋㅋㅋㅋ/!!!!!/?????)은 짧게 압축
-    3) 연속 동일 줄 도배는 "(xN)"으로 런-길이 압축
+    1) 이모티콘 {:...:} 형식 제거 (옵션)
+    2) 줄 전체가 웃음/감탄/기호 등 '노이즈만'이면 제거
+    3) 줄 내부 반복(ㅋㅋㅋㅋ/!!!!!/?????)은 짧게 압축
+    4) 연속 동일 줄 도배는 "(xN)"으로 런-길이 압축
     """
     cleaned: list[str] = []
     for ln in lines:
         s = ln.strip()
         if not s:
             continue
+        # 이모티콘 제거
+        if remove_emoticons_flag:
+            s = remove_emoticons(s)
+            if not s:  # 이모티콘만 있던 줄은 제거
+                continue
         s = compress_repeats(s)
         if is_noise_only_line(s):
             continue
@@ -266,6 +282,7 @@ def process_file(
     do_denoise: bool,
     dedup_run_min: int,
     max_lines: int,
+    remove_emoticons: bool = True,
 ) -> dict[str, Any]:
     """단일 파일을 처리하고 LLM을 실행하여 결과를 반환"""
     raw_text = open(input_path, "r", encoding="utf-8").read()
@@ -274,9 +291,17 @@ def process_file(
     lines = cleaned.splitlines()
 
     if do_denoise:
-        lines = preprocess_chat_lines(lines, dedup_run_min=max(2, dedup_run_min))
+        lines = preprocess_chat_lines(
+            lines,
+            dedup_run_min=max(2, dedup_run_min),
+            remove_emoticons_flag=remove_emoticons,
+        )
     else:
-        lines = [ln.strip() for ln in lines if ln.strip()]
+        if remove_emoticons:
+            lines = [remove_emoticons(ln.strip()) for ln in lines if ln.strip()]
+            lines = [ln for ln in lines if ln]  # 빈 줄 제거
+        else:
+            lines = [ln.strip() for ln in lines if ln.strip()]
 
     if max_lines and max_lines > 0 and len(lines) > max_lines:
         lines = lines[-max_lines:]
@@ -356,12 +381,21 @@ def prepare_chat_text_from_lines(
     do_denoise: bool,
     dedup_run_min: int,
     max_lines: int,
+    remove_emoticons: bool = True,
 ) -> str:
     """메시지 라인들을 전처리하여 채팅 텍스트로 변환 (기존 process_file 로직 재사용)"""
     if do_denoise:
-        lines = preprocess_chat_lines(lines, dedup_run_min=max(2, dedup_run_min))
+        lines = preprocess_chat_lines(
+            lines,
+            dedup_run_min=max(2, dedup_run_min),
+            remove_emoticons_flag=remove_emoticons,
+        )
     else:
-        lines = [ln.strip() for ln in lines if ln.strip()]
+        if remove_emoticons:
+            lines = [remove_emoticons(ln.strip()) for ln in lines if ln.strip()]
+            lines = [ln for ln in lines if ln]  # 빈 줄 제거
+        else:
+            lines = [ln.strip() for ln in lines if ln.strip()]
 
     if max_lines and max_lines > 0 and len(lines) > max_lines:
         lines = lines[-max_lines:]
@@ -431,6 +465,8 @@ def process_json_file(
     dedup_run_min: int,
     max_lines: int,
     threads: int,
+    output_dir: str,
+    remove_emoticons: bool = True,
 ) -> dict[str, Any]:
     """JSON 파일을 읽어서 각 이벤트를 병렬로 요약하고 summary JSON 생성"""
     # JSON 파일 읽기
@@ -450,7 +486,7 @@ def process_json_file(
         # 메시지 전처리 (기존 함수 재사용)
         lines = [msg.strip() for msg in messages if msg.strip()]
         chat_text = prepare_chat_text_from_lines(
-            lines, do_denoise, dedup_run_min, max_lines
+            lines, do_denoise, dedup_run_min, max_lines, remove_emoticons
         )
 
         # LLM 요약 (기존 함수 재사용)
@@ -513,8 +549,14 @@ def process_json_file(
     }
 
     # 출력 파일명 생성
-    base_name = os.path.splitext(json_path)[0]
-    output_path = base_name + "_summary.json"
+    base_name = os.path.splitext(os.path.basename(json_path))[0]
+    output_filename = base_name + "_summary.json"
+
+    # 출력 폴더 생성 (없으면)
+    os.makedirs(output_dir, exist_ok=True)
+
+    # 출력 경로 생성
+    output_path = os.path.join(output_dir, output_filename)
 
     # JSON 파일로 저장
     with open(output_path, "w", encoding="utf-8") as f:
@@ -604,6 +646,20 @@ def main():
         default=12,
         help="폴더 처리 시 동시에 처리할 파일 수 (기본 12)",
     )
+    ap.add_argument(
+        "--output-dir",
+        type=str,
+        default="../web/public/summary",
+        help="JSON 모드에서 출력 파일을 저장할 폴더 경로 (기본: ../web/public/summary)",
+    )
+    # 이모티콘 제거 옵션 (기본값: True, 즉 이모티콘 제거)
+    ap.add_argument(
+        "--keep-emoticons",
+        action="store_false",
+        dest="remove_emoticons",
+        default=True,
+        help="이모티콘 {:...:} 형식 유지 (기본값: 이모티콘 제거)",
+    )
 
     args = ap.parse_args()
 
@@ -673,6 +729,8 @@ def main():
             args.dedup_run_min,
             args.max_lines,
             args.threads,
+            args.output_dir,
+            args.remove_emoticons,
         )
         print(f"처리 완료: {result['input_path']} -> {result['output_path']}")
         print(f"처리된 이벤트 수: {result['events_processed']}")
@@ -694,6 +752,7 @@ def main():
             do_denoise,
             args.dedup_run_min,
             args.max_lines,
+            args.remove_emoticons,
         )
         print_file_results(file_result)
     elif os.path.isdir(input_path):
@@ -725,6 +784,7 @@ def main():
                 do_denoise,
                 args.dedup_run_min,
                 args.max_lines,
+                args.remove_emoticons,
             )
 
         file_results = run_parallel_with_progress(

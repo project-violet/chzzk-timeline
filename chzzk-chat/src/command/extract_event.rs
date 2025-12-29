@@ -7,15 +7,25 @@ use std::path::Path;
 use crate::data::chat;
 use crate::data::chat::EventInterval;
 use crate::data::models::ChatLog;
+use crate::data::utils;
+use chrono::{Duration as ChronoDuration, FixedOffset, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json;
 
 /// 이벤트 추출 옵션
 #[derive(structopt::StructOpt, Debug)]
 pub struct ExtractEventOpt {
-    /// Video ID
+    /// Video ID (channel과 함께 사용할 수 없음)
     #[structopt(long)]
-    pub video_id: u64,
+    pub video_id: Option<u64>,
+
+    /// Channel ID (video_id와 함께 사용할 수 없음, recent_days 필수)
+    #[structopt(long)]
+    pub channel: Option<String>,
+
+    /// 최근 N일 (channel과 함께 사용 시 필수)
+    #[structopt(long)]
+    pub recent_days: Option<u64>,
 
     /// 헤더 출력 여부 (true/false, 기본값: false)
     #[structopt(long, default_value = "false")]
@@ -30,40 +40,146 @@ pub struct ExtractEventOpt {
     pub output_json: String,
 }
 
-/// 특정 video_id의 이벤트를 추출하여 파일로 저장합니다.
+/// 특정 video_id 또는 channel의 최근 n일 이벤트를 추출하여 파일로 저장합니다.
 pub fn run_extract_event(opts: &ExtractEventOpt) -> Result<()> {
     use crate::load_channels_and_chat_logs;
     use crate::AnalysisChatOpt;
-
-    // 채팅 로그 로드
-    let (_, chat_logs) = load_channels_and_chat_logs(&AnalysisChatOpt::default())?;
-
-    // 특정 video_id 찾기
-    let chat_log = chat_logs
-        .iter()
-        .find(|log| log.video_id == opts.video_id)
-        .ok_or_else(|| {
-            color_eyre::eyre::eyre!("Video ID {} not found in chat logs", opts.video_id)
-        })?;
-
-    // 이벤트 탐지
-    let event_result = chat::detect_event_intervals(chat_log).ok_or_else(|| {
-        color_eyre::eyre::eyre!("Failed to detect events for video {}", opts.video_id)
-    })?;
-
-    // 이벤트 출력
-    chat::print_event_intervals(&event_result);
 
     // 문자열을 bool로 변환
     let print_header = opts.print_header.parse::<bool>().unwrap_or(false);
     let print_timestamp = opts.print_timestamp.parse::<bool>().unwrap_or(false);
     let output_json = opts.output_json.parse::<bool>().unwrap_or(true);
 
-    // JSON 또는 파일로 저장
-    if output_json {
-        save_event_chats_to_json(chat_log, &event_result)?;
-    } else {
-        save_event_chats_to_files(chat_log, &event_result, print_header, print_timestamp)?;
+    // video_id 또는 channel 중 하나는 반드시 지정되어야 함
+    if opts.video_id.is_none() && opts.channel.is_none() {
+        return Err(color_eyre::eyre::eyre!(
+            "video_id 또는 channel 중 하나는 반드시 지정되어야 합니다"
+        ));
+    }
+
+    // video_id와 channel은 함께 사용할 수 없음
+    if opts.video_id.is_some() && opts.channel.is_some() {
+        return Err(color_eyre::eyre::eyre!(
+            "video_id와 channel은 함께 사용할 수 없습니다"
+        ));
+    }
+
+    // channel을 사용할 때는 recent_days가 필수
+    if opts.channel.is_some() && opts.recent_days.is_none() {
+        return Err(color_eyre::eyre::eyre!(
+            "channel을 사용할 때는 recent_days가 필수입니다"
+        ));
+    }
+
+    // 채널과 채팅 로그 로드
+    let (channels, chat_logs) = load_channels_and_chat_logs(&AnalysisChatOpt::default())?;
+
+    // video_id 모드: 기존 로직
+    if let Some(video_id) = opts.video_id {
+        // 특정 video_id 찾기
+        let chat_log = chat_logs
+            .iter()
+            .find(|log| log.video_id == video_id)
+            .ok_or_else(|| {
+                color_eyre::eyre::eyre!("Video ID {} not found in chat logs", video_id)
+            })?;
+
+        // 이벤트 탐지
+        let event_result = chat::detect_event_intervals(chat_log).ok_or_else(|| {
+            color_eyre::eyre::eyre!("Failed to detect events for video {}", video_id)
+        })?;
+
+        // 이벤트 출력
+        chat::print_event_intervals(&event_result);
+
+        // JSON 또는 파일로 저장
+        if output_json {
+            save_event_chats_to_json(chat_log, &event_result)?;
+        } else {
+            save_event_chats_to_files(chat_log, &event_result, print_header, print_timestamp)?;
+        }
+    }
+    // channel 모드: 최근 n일 처리
+    else if let Some(channel_id) = &opts.channel {
+        let recent_days = opts.recent_days.unwrap(); // validation에 의해 항상 Some
+
+        // 채널 찾기
+        let channel = channels
+            .iter()
+            .find(|ch| ch.channel_id == *channel_id)
+            .ok_or_else(|| color_eyre::eyre::eyre!("Channel ID {} not found", channel_id))?;
+
+        // 최근 n일 계산 (현재 시간 기준)
+        let now = Utc::now().with_timezone(&FixedOffset::east_opt(9 * 3600).unwrap()); // KST
+        let cutoff_date = now - ChronoDuration::days(recent_days as i64);
+
+        println!(
+            "Processing channel: {} ({}), filtering videos from last {} days (since {})",
+            channel.name,
+            channel_id,
+            recent_days,
+            cutoff_date.format("%Y-%m-%d %H:%M:%S")
+        );
+
+        // 해당 채널의 최근 n일 내 비디오 찾기
+        let recent_video_ids: HashSet<u64> = channel
+            .replays
+            .iter()
+            .filter_map(|replay| {
+                // replay.start 파싱
+                utils::parse_replay_time(&replay.start)
+                    .ok()
+                    .map(|start_time| (replay.video_no, start_time >= cutoff_date))
+                    .filter(|(_, is_recent)| *is_recent)
+                    .map(|(video_no, _)| video_no)
+            })
+            .collect();
+
+        println!("Found {} recent videos in channel", recent_video_ids.len());
+
+        // 해당 비디오들의 채팅 로그 찾기 및 처리
+        let matching_chat_logs: Vec<_> = chat_logs
+            .iter()
+            .filter(|log| recent_video_ids.contains(&log.video_id))
+            .collect();
+
+        if matching_chat_logs.is_empty() {
+            return Err(color_eyre::eyre::eyre!(
+                "No chat logs found for channel {} in the last {} days",
+                channel_id,
+                recent_days
+            ));
+        }
+
+        println!("Processing {} chat logs...", matching_chat_logs.len());
+
+        // 각 비디오마다 이벤트 추출
+        for chat_log in matching_chat_logs {
+            println!("\n=== Processing Video ID: {} ===", chat_log.video_id);
+
+            // 이벤트 탐지
+            if let Some(event_result) = chat::detect_event_intervals(chat_log) {
+                // 이벤트 출력
+                chat::print_event_intervals(&event_result);
+
+                // JSON 또는 파일로 저장
+                if output_json {
+                    save_event_chats_to_json(chat_log, &event_result)?;
+                } else {
+                    save_event_chats_to_files(
+                        chat_log,
+                        &event_result,
+                        print_header,
+                        print_timestamp,
+                    )?;
+                }
+            } else {
+                println!(
+                    "Warning: Failed to detect events for video {}",
+                    chat_log.video_id
+                );
+            }
+        }
     }
 
     Ok(())
