@@ -1,23 +1,11 @@
-# litellm_peak_summarize.py
+# llm-chat-event.py
 # ------------------------------------------------------------
 # pip install -U litellm python-dotenv tqdm
 #
-# 예)
-#   python litellm_peak_summarize.py --input chat_a.log --engine gemini2
-#   python litellm_peak_summarize.py --input chat_a.log --suite all
-#   python litellm_peak_summarize.py --input chat_a.log --models openai/gpt-5.2 gemini/gemini-2.0-flash groq/llama-3.3-70b-versatile xai/grok-4-1-fast-non-reasoning
-#
-# 폴더 처리 (병렬 처리, progress bar 지원)
-#   python litellm_peak_summarize.py --input ./chat_folder --engine gemini2
-#   python litellm_peak_summarize.py --input ./chat_folder --engine gemini2 --file_workers 12
-#
-# 노이즈 제거 옵션(추천)
-#   python litellm_peak_summarize.py --input chat_a.log --suite fast --denoise --dedup_run_min 3
-#   python litellm_peak_summarize.py --input chat_a.log --engine groq_70b --no_denoise
-#
 # JSON 파일 모드 (extract_event.rs가 생성한 JSON 파일 처리)
-#   python llm-chat-event.py --json --input 10307278_chat.json --engine gemini2
-#   python llm-chat-event.py --json --input 10307278_chat.json --engine gemini25 --denoise
+#   python llm-chat-event.py --input 10307278_chat.json --engine gemini2
+#   python llm-chat-event.py --input 10307278_chat.json --engine gemini25 --denoise
+#   python llm-chat-event.py --input 10307278_chat.json --engine gemini2 --output-dir ./output
 # ------------------------------------------------------------
 
 import argparse
@@ -35,8 +23,6 @@ try:
 except ImportError:
     # tqdm이 없으면 기본 print 사용
     tqdm = None
-
-TS_PREFIX_RE = re.compile(r"^\[\d{2}:\d{2}:\d{2}\]\s*:\s*")
 
 # 이모티콘 패턴: {:...:} 형식 (예: {:tmRainbowdance:}, {:d_41:})
 EMOTICON_RE = re.compile(r"\{:[^}]+\}")
@@ -131,11 +117,6 @@ def preprocess_chat_lines(
 # -------------------------
 # LLM runner
 # -------------------------
-
-
-def strip_timestamps(raw_text: str) -> str:
-    # 각 라인의 맨 앞 '[HH:MM:SS] : ' 만 제거
-    return "\n".join(TS_PREFIX_RE.sub("", line) for line in raw_text.splitlines())
 
 
 def pick_api_key(model: str) -> str | None:
@@ -268,94 +249,6 @@ def run_model(
     r2 = call_once(model, fixup, max_tokens, temperature, timeout_s, reasoning)
     r2["model"] = model + " (retry)"
     return r2
-
-
-def process_file(
-    input_path: str,
-    models: list[str],
-    max_tokens: int,
-    temperature: float,
-    timeout_s: float,
-    reasoning: str | None,
-    retry_on_bad_format: bool,
-    threads: int,
-    do_denoise: bool,
-    dedup_run_min: int,
-    max_lines: int,
-    remove_emoticons: bool = True,
-) -> dict[str, Any]:
-    """단일 파일을 처리하고 LLM을 실행하여 결과를 반환"""
-    raw_text = open(input_path, "r", encoding="utf-8").read()
-    cleaned = strip_timestamps(raw_text)
-
-    lines = cleaned.splitlines()
-
-    if do_denoise:
-        lines = preprocess_chat_lines(
-            lines,
-            dedup_run_min=max(2, dedup_run_min),
-            remove_emoticons_flag=remove_emoticons,
-        )
-    else:
-        if remove_emoticons:
-            lines = [remove_emoticons(ln.strip()) for ln in lines if ln.strip()]
-            lines = [ln for ln in lines if ln]  # 빈 줄 제거
-        else:
-            lines = [ln.strip() for ln in lines if ln.strip()]
-
-    if max_lines and max_lines > 0 and len(lines) > max_lines:
-        lines = lines[-max_lines:]
-
-    chat_text = "\n".join(lines)
-    messages = build_messages(chat_text)
-
-    # 병렬 실행
-    results = []
-    with ThreadPoolExecutor(max_workers=max(1, threads)) as ex:
-        futs = {
-            ex.submit(
-                run_model,
-                m,
-                messages,
-                max_tokens,
-                temperature,
-                timeout_s,
-                reasoning,
-                retry_on_bad_format,
-            ): m
-            for m in models
-        }
-        for fut in as_completed(futs):
-            try:
-                results.append(fut.result())
-            except Exception as e:
-                results.append({"model": futs[fut], "error": repr(e)})
-
-    return {
-        "filename": os.path.basename(input_path),
-        "filepath": input_path,
-        "results": sorted(
-            results,
-            key=lambda x: (x.get("error") is not None, x.get("latency_ms") or 1e18),
-        ),
-    }
-
-
-def print_file_results(file_result: dict[str, Any]):
-    """파일 처리 결과를 출력"""
-    print("=" * 80)
-    print(f"FILE: {file_result['filename']}")
-    for r in file_result["results"]:
-        print()
-        print(f"MODEL: {r.get('model')}")
-        if r.get("error"):
-            print(f"ERROR: {r['error']}")
-            continue
-        print(
-            f"LATENCY: {r['latency_ms']:.1f}ms | TOKENS: prompt={r.get('prompt_tokens')} completion={r.get('completion_tokens')} total={r.get('total_tokens')}"
-        )
-        print(r.get("text", ""))
-    print()
 
 
 def parse_llm_output(text: str) -> dict[str, str] | None:
@@ -588,12 +481,9 @@ def main():
 
     ap = argparse.ArgumentParser()
     ap.add_argument(
-        "--input", required=True, help="원본 채팅 txt 파일, 폴더 경로, 또는 JSON 파일"
-    )
-    ap.add_argument(
-        "--json",
-        action="store_true",
-        help="JSON 파일 모드 (extract_event.rs가 생성한 JSON 파일 처리)",
+        "--input",
+        required=True,
+        help="JSON 파일 경로 (extract_event.rs가 생성한 JSON 파일)",
     )
     ap.add_argument(
         "--engine", default=None, choices=sorted(engines.keys()), help="프리셋 엔진"
@@ -605,7 +495,10 @@ def main():
         help="직접 model 리스트 (예: openai/gpt-5.2 gemini/gemini-2.0-flash ...)",
     )
     ap.add_argument(
-        "--suite", default=None, choices=["all", "fast"], help="여러 모델 한번에"
+        "--suite",
+        default=None,
+        choices=["fast"],
+        help="fast 프리셋 사용 (기본값: gemini25)",
     )
     ap.add_argument("--threads", type=int, default=12, help="동시 호출 개수(병렬)")
     ap.add_argument("--max_tokens", type=int, default=256)
@@ -641,12 +534,6 @@ def main():
         help="(선택) 전처리 후 최대 줄 수(0이면 제한 없음). 초과 시 마지막 N줄만 유지",
     )
     ap.add_argument(
-        "--file_workers",
-        type=int,
-        default=12,
-        help="폴더 처리 시 동시에 처리할 파일 수 (기본 12)",
-    )
-    ap.add_argument(
         "--output-dir",
         type=str,
         default="../web/public/summary",
@@ -670,156 +557,49 @@ def main():
     if args.denoise:
         do_denoise = True
 
-    # 실행할 모델들 결정
+    # JSON 파일 검증
+    if not os.path.isfile(args.input):
+        print(f"오류: '{args.input}'는 유효한 파일이 아닙니다.")
+        return
+
+    if not args.input.endswith(".json"):
+        print(f"오류: .json 파일이 필요합니다.")
+        return
+
+    # 모델 선택 (단일 모델만 사용)
     if args.models:
-        models = args.models
+        model = args.models[0]
     elif args.engine:
-        models = [engines[args.engine]]
+        model = engines[args.engine]
     elif args.suite == "fast":
-        models = [
-            engines["gemini2"],
-            engines["gemini25"],
-            engines["groq_8b"],
-            engines["grok_fast"],
-        ]
-    else:  # default
-        models = [
-            engines["gemini25"],
-            engines["groq_70b"],
-            engines["grok_fast"],
-            engines["gpt52"],
-        ]
-
-    # JSON 모드 처리
-    if args.json:
-        if not os.path.isfile(args.input):
-            print(f"오류: '{args.input}'는 유효한 파일이 아닙니다.")
-            return
-
-        if not args.input.endswith(".json"):
-            print(f"오류: JSON 모드에서는 .json 파일이 필요합니다.")
-            return
-
-        # 모델 선택 (JSON 모드에서는 단일 모델만 사용)
-        if args.models:
-            model = args.models[0]
-        elif args.engine:
-            model = engines[args.engine]
-        elif args.suite == "fast":
-            model = engines["gemini2"]
-        else:
-            model = engines["gemini25"]
-
-        # 기본 denoise 설정
-        do_denoise = True
-        if args.no_denoise:
-            do_denoise = False
-        if args.denoise:
-            do_denoise = True
-
-        result = process_json_file(
-            args.input,
-            model,
-            args.max_tokens,
-            args.temperature,
-            args.timeout,
-            args.reasoning,
-            args.retry_on_bad_format,
-            do_denoise,
-            args.dedup_run_min,
-            args.max_lines,
-            args.threads,
-            args.output_dir,
-            args.remove_emoticons,
-        )
-        print(f"처리 완료: {result['input_path']} -> {result['output_path']}")
-        print(f"처리된 이벤트 수: {result['events_processed']}")
-        return
-
-    # 입력이 파일인지 폴더인지 확인
-    input_path = args.input
-    if os.path.isfile(input_path):
-        # 단일 파일 처리
-        file_result = process_file(
-            input_path,
-            models,
-            args.max_tokens,
-            args.temperature,
-            args.timeout,
-            args.reasoning,
-            args.retry_on_bad_format,
-            args.threads,
-            do_denoise,
-            args.dedup_run_min,
-            args.max_lines,
-            args.remove_emoticons,
-        )
-        print_file_results(file_result)
-    elif os.path.isdir(input_path):
-        # 폴더인 경우 파일명 순으로 정렬하여 각 파일 처리
-        file_list = [
-            f
-            for f in os.listdir(input_path)
-            if os.path.isfile(os.path.join(input_path, f))
-        ]
-        file_list.sort()  # 파일명 순으로 정렬
-
-        if not file_list:
-            print(f"경고: 폴더 '{input_path}'에 파일이 없습니다.")
-            return
-
-        # 병렬로 파일 처리
-        file_paths = [os.path.join(input_path, f) for f in file_list]
-
-        def process_single_file(file_path: str) -> dict[str, Any]:
-            return process_file(
-                file_path,
-                models,
-                args.max_tokens,
-                args.temperature,
-                args.timeout,
-                args.reasoning,
-                args.retry_on_bad_format,
-                args.threads,
-                do_denoise,
-                args.dedup_run_min,
-                args.max_lines,
-                args.remove_emoticons,
-            )
-
-        file_results = run_parallel_with_progress(
-            file_paths,
-            process_single_file,
-            "파일 처리",
-            "파일",
-            args.file_workers,
-        )
-
-        # 에러 처리 및 파일명 순으로 정렬
-        processed_results = []
-        for i, result in enumerate(file_results):
-            if result is None:
-                file_path = file_paths[i]
-                processed_results.append(
-                    {
-                        "filename": os.path.basename(file_path),
-                        "filepath": file_path,
-                        "results": [{"error": "처리 중 오류 발생"}],
-                    }
-                )
-            else:
-                processed_results.append(result)
-
-        # 파일명 순으로 결과 정렬
-        processed_results.sort(key=lambda x: x["filename"])
-        file_results = processed_results
-
-        # 결과 출력
-        for file_result in file_results:
-            print_file_results(file_result)
+        model = engines["gemini2"]
     else:
-        print(f"오류: '{input_path}'는 유효한 파일 또는 폴더가 아닙니다.")
-        return
+        model = engines["gemini25"]
+
+    # 기본 denoise 설정
+    do_denoise = True
+    if args.no_denoise:
+        do_denoise = False
+    if args.denoise:
+        do_denoise = True
+
+    result = process_json_file(
+        args.input,
+        model,
+        args.max_tokens,
+        args.temperature,
+        args.timeout,
+        args.reasoning,
+        args.retry_on_bad_format,
+        do_denoise,
+        args.dedup_run_min,
+        args.max_lines,
+        args.threads,
+        args.output_dir,
+        args.remove_emoticons,
+    )
+    print(f"처리 완료: {result['input_path']} -> {result['output_path']}")
+    print(f"처리된 이벤트 수: {result['events_processed']}")
 
 
 if __name__ == "__main__":
