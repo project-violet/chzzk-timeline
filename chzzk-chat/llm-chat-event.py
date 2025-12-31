@@ -362,6 +362,28 @@ def process_json_file(
     remove_emoticons: bool = True,
 ) -> dict[str, Any]:
     """JSON 파일을 읽어서 각 이벤트를 병렬로 요약하고 summary JSON 생성"""
+    # 출력 파일명 생성
+    base_name = os.path.splitext(os.path.basename(json_path))[0]
+    output_filename = base_name + "_summary.json"
+
+    # 출력 폴더 생성 (없으면)
+    os.makedirs(output_dir, exist_ok=True)
+
+    # 출력 경로 생성
+    output_path = os.path.join(output_dir, output_filename)
+
+    # 이미 결과 파일이 있으면 건너뛰기
+    if os.path.isfile(output_path):
+        # 이벤트 개수를 확인하기 위해 JSON 파일 읽기
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return {
+            "input_path": json_path,
+            "output_path": output_path,
+            "events_processed": len(data["events"]),
+            "skipped": True,
+        }
+
     # JSON 파일 읽기
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -440,16 +462,6 @@ def process_json_file(
         "first_message_time": first_message_time,
         "events": processed_events,
     }
-
-    # 출력 파일명 생성
-    base_name = os.path.splitext(os.path.basename(json_path))[0]
-    output_filename = base_name + "_summary.json"
-
-    # 출력 폴더 생성 (없으면)
-    os.makedirs(output_dir, exist_ok=True)
-
-    # 출력 경로 생성
-    output_path = os.path.join(output_dir, output_filename)
 
     # JSON 파일로 저장
     with open(output_path, "w", encoding="utf-8") as f:
@@ -598,8 +610,12 @@ def main():
         args.output_dir,
         args.remove_emoticons,
     )
-    print(f"처리 완료: {result['input_path']} -> {result['output_path']}")
-    print(f"처리된 이벤트 수: {result['events_processed']}")
+    if result.get("skipped"):
+        print(f"건너뜀 (이미 존재): {result['input_path']} -> {result['output_path']}")
+        print(f"이벤트 수: {result['events_processed']}")
+    else:
+        print(f"처리 완료: {result['input_path']} -> {result['output_path']}")
+        print(f"처리된 이벤트 수: {result['events_processed']}")
 
 
 if __name__ == "__main__":
