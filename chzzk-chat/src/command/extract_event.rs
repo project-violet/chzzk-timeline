@@ -206,8 +206,14 @@ fn save_event_chats_to_json(
     event_result: &chat::EventDetectionResult,
 ) -> Result<()> {
     // JSON 파일명 생성
-    let filename = format!("{}_chat.json", chat_log.video_id);
+    let filename = format!("chats/{}_chat.json", chat_log.video_id);
     let file_path = Path::new(&filename);
+
+    // 디렉터리 생성
+    if let Some(parent) = file_path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create directory: {:?}", parent))?;
+    }
 
     // 중복 체크를 위한 HashSet: (start_sec, end_sec) 쌍을 저장
     let mut seen_intervals: HashSet<(i64, i64)> = HashSet::new();
