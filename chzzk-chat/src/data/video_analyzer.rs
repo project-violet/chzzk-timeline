@@ -3,12 +3,13 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
-use chrono::{DateTime, Duration, FixedOffset, NaiveDateTime, TimeZone};
+use chrono::{DateTime, Duration, FixedOffset};
 use color_eyre::eyre::{Context, Result};
 use rayon::prelude::*;
 use serde::Serialize;
 
 use crate::data::models::{ChannelWithReplays, ChatLog, Replay};
+use crate::data::utils::parse_replay_time;
 
 /// 비디오 연관도 정보
 #[derive(Debug, Clone, Serialize)]
@@ -26,45 +27,6 @@ pub struct VideoRelation {
 }
 
 /// Replay의 start/end 문자열을 DateTime으로 파싱합니다.
-fn parse_replay_time(time_str: &str) -> Result<DateTime<FixedOffset>> {
-    // ISO 8601 형식 또는 다른 형식 시도
-    // 예: "2024-11-10T10:00:00+09:00" 또는 "2024-11-10 10:00:00"
-
-    // 먼저 ISO 8601 형식 시도
-    if let Ok(dt) = DateTime::parse_from_rfc3339(time_str) {
-        return Ok(dt);
-    }
-
-    // RFC 3339 형식 시도 (Z 또는 +09:00 포함)
-    if let Ok(dt) = DateTime::parse_from_str(time_str, "%Y-%m-%dT%H:%M:%S%z") {
-        return Ok(dt);
-    }
-
-    // NaiveDateTime으로 파싱 후 KST(+09:00) 오프셋 적용
-    if let Ok(naive_dt) = NaiveDateTime::parse_from_str(time_str, "%Y-%m-%d %H:%M:%S") {
-        let kst_offset = FixedOffset::east_opt(9 * 3600)
-            .ok_or_else(|| color_eyre::eyre::eyre!("Invalid timezone offset"))?;
-        return Ok(kst_offset
-            .from_local_datetime(&naive_dt)
-            .single()
-            .ok_or_else(|| color_eyre::eyre::eyre!("Ambiguous local time"))?);
-    }
-
-    // ISO 형식 (공백 포함) 시도
-    if let Ok(naive_dt) = NaiveDateTime::parse_from_str(time_str, "%Y-%m-%dT%H:%M:%S") {
-        let kst_offset = FixedOffset::east_opt(9 * 3600)
-            .ok_or_else(|| color_eyre::eyre::eyre!("Invalid timezone offset"))?;
-        return Ok(kst_offset
-            .from_local_datetime(&naive_dt)
-            .single()
-            .ok_or_else(|| color_eyre::eyre::eyre!("Ambiguous local time"))?);
-    }
-
-    Err(color_eyre::eyre::eyre!(
-        "Failed to parse time string: {}",
-        time_str
-    ))
-}
 
 /// 두 시간 범위가 겹치는지 확인합니다.
 ///
@@ -94,9 +56,7 @@ fn build_video_user_map(chat_logs: &[ChatLog]) -> HashMap<u64, HashSet<String>> 
     let mut video_users: HashMap<u64, HashSet<String>> = HashMap::new();
 
     for chat_log in chat_logs {
-        let users = video_users
-            .entry(chat_log.video_id)
-            .or_insert_with(HashSet::new);
+        let users = video_users.entry(chat_log.video_id).or_default();
 
         for message in &chat_log.messages {
             users.insert(message.user_id.clone());
@@ -140,6 +100,7 @@ fn calculate_user_overlap_similarity(
 ///
 /// # Returns
 /// 시간 범위가 겹치고 채팅 유저가 겹치는 리플레이들의 연관도 정보
+#[allow(dead_code)]
 pub fn find_related_replays(
     target_video_no: u64,
     channels: &[ChannelWithReplays],
@@ -248,6 +209,7 @@ pub fn find_related_replays(
 }
 
 /// 연관된 리플레이 정보를 출력합니다.
+#[allow(dead_code)]
 pub fn print_related_replays(relations: &[VideoRelation], max_count: Option<usize>) {
     let display_count = max_count.unwrap_or(relations.len()).min(relations.len());
 
@@ -364,12 +326,12 @@ pub fn analyze_all_video_relations(
 
             // 대상 비디오의 시간 범위 파싱
             let target_start = match time_cache_ref.get(target_replay.start.as_str()) {
-                Some(dt) => dt.clone(),
+                Some(dt) => *dt,
                 None => return None,
             };
 
             let target_end = match time_cache_ref.get(target_replay.end.as_str()) {
-                Some(dt) => dt.clone(),
+                Some(dt) => *dt,
                 None => return None,
             };
 
@@ -392,12 +354,12 @@ pub fn analyze_all_video_relations(
 
                     // 시간 범위 파싱
                     let candidate_start = match time_cache_ref.get(replay.start.as_str()) {
-                        Some(dt) => dt.clone(),
+                        Some(dt) => *dt,
                         None => continue,
                     };
 
                     let candidate_end = match time_cache_ref.get(replay.end.as_str()) {
-                        Some(dt) => dt.clone(),
+                        Some(dt) => *dt,
                         None => continue,
                     };
 

@@ -6,9 +6,11 @@ import { VideoHeader } from './VideoHeader.jsx';
 import { VideoInfo } from './VideoInfo.jsx';
 import { ChatSearchSection } from './ChatSearchSection.jsx';
 import { ChatKeywordRanking } from './ChatKeywordRanking.jsx';
+import { PeakTimeline } from './PeakTimeline.jsx';
 import { RelatedVideos } from './RelatedVideos.jsx';
 import { RelatedChannels } from './RelatedChannels.jsx';
 import { RelatedTimelineSection } from './RelatedTimelineSection.jsx';
+import { parseChatLog, extractTopKeywords } from './ChatLogParser.js';
 
 const ChatPage = () => {
     const { videoId } = useParams();
@@ -264,6 +266,18 @@ const ChatPage = () => {
         });
     }, [relatedVideosData, videoInfo, videoId]);
 
+    // 키워드 존재 여부 확인
+    const hasKeywords = useMemo(() => {
+        if (!chatLogText || chatLogLoading) return false;
+        try {
+            const messages = parseChatLog(chatLogText);
+            const keywords = extractTopKeywords(messages, 100, 2);
+            return keywords && keywords.length > 0;
+        } catch (err) {
+            return false;
+        }
+    }, [chatLogText, chatLogLoading]);
+
     // 연관 비디오 데이터 로드 (공용)
     useEffect(() => {
         if (!videoId) {
@@ -415,8 +429,14 @@ const ChatPage = () => {
                             {isMobile ? (
                                 <>
                                     <div className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40">
-                                        <ChatKeywordRanking chatLogText={chatLogText} chatLogLoading={chatLogLoading} onKeywordClick={setSearchKeyword} />
+                                        <PeakTimeline videoId={videoId} onTimelinePointDoubleClick={handleTimelinePointDoubleClick} />
                                     </div>
+
+                                    {hasKeywords && (
+                                        <div className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40">
+                                            <ChatKeywordRanking chatLogText={chatLogText} chatLogLoading={chatLogLoading} onKeywordClick={setSearchKeyword} />
+                                        </div>
+                                    )}
 
                                     {relatedVideosData.length > 0 && (
                                         <RelatedTimelineSection
@@ -451,8 +471,14 @@ const ChatPage = () => {
                     {!isMobile && (
                         <div className="lg:sticky lg:top-28">
                             <div className="overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40">
-                                <ChatKeywordRanking chatLogText={chatLogText} chatLogLoading={chatLogLoading} onKeywordClick={setSearchKeyword} />
+                                <PeakTimeline videoId={videoId} onTimelinePointDoubleClick={handleTimelinePointDoubleClick} />
                             </div>
+
+                            {hasKeywords && (
+                                <div className="mt-6 overflow-hidden rounded-3xl border border-slate-800/70 bg-slate-900/95 p-6 shadow-lg shadow-slate-900/40">
+                                    <ChatKeywordRanking chatLogText={chatLogText} chatLogLoading={chatLogLoading} onKeywordClick={setSearchKeyword} />
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
