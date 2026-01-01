@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Text, Stack, ScrollArea, Loader, Center, Badge, Paper, Tooltip, SegmentedControl } from '@mantine/core';
+import { Text, Stack, ScrollArea, Loader, Center, Badge, Tooltip, SegmentedControl, CopyButton, Button } from '@mantine/core';
 
 const EventItem = ({ event, index, originalIndex, formatSeconds, onDoubleClick }) => {
     const [isHovered, setIsHovered] = useState(false);
@@ -149,6 +149,57 @@ export const PeakTimeline = ({ videoId, onTimelinePointDoubleClick }) => {
         }
     }, [events, sortMode]);
 
+    const sortModeLabel = useMemo(() => {
+        switch (sortMode) {
+            case 'zscore':
+                return 'Z-score';
+            case 'peak':
+                return 'Peak';
+            case 'default':
+            default:
+                return '기본';
+        }
+    }, [sortMode]);
+
+    const copyText = useMemo(() => {
+        if (!videoId) return '';
+        if (!sortedEvents || sortedEvents.length === 0) {
+            return `[피크 타임라인]\nvideoId: ${videoId}\n정렬: ${sortModeLabel}\n(이벤트 없음)`;
+        }
+
+        const lines = [];
+        lines.push('[피크 타임라인]');
+        lines.push(`videoId: ${videoId}`);
+        lines.push(`정렬: ${sortModeLabel}`);
+        lines.push(`총 ${sortedEvents.length}개`);
+        lines.push('');
+
+        for (let i = 0; i < sortedEvents.length; i++) {
+            const e = sortedEvents[i];
+            const originalNo = (e.originalIndex ?? 0) + 1;
+            const start = formatSeconds(e.event.start_sec);
+            const end = formatSeconds(e.event.end_sec);
+            const z = typeof e.event.peak_z_score === 'number' ? e.event.peak_z_score.toFixed(2) : String(e.event.peak_z_score ?? '');
+            const title = (e.title ?? '').trim();
+            const summary = (e.summary ?? '').trim();
+
+            const titlePart = title ? ` ${title}` : '';
+            const scorePart = ` (score=${z})`;
+            lines.push(
+                `- #${originalNo} [${start}~${end}]${titlePart}${scorePart}`
+            );
+            if (summary) {
+                lines.push(`  ${summary}`);
+            }
+            // 마지막 이벤트가 아니면 빈 줄 추가
+            if (i < sortedEvents.length - 1) {
+                lines.push('');
+            }
+        }
+
+        return lines.join('\n');
+    }, [videoId, sortedEvents, sortModeLabel]);
+
     if (!videoId) {
         return null;
     }
@@ -160,17 +211,25 @@ export const PeakTimeline = ({ videoId, onTimelinePointDoubleClick }) => {
                     피크 타임라인
                 </Text>
                 {!loading && !error && events && events.length > 0 && (
-                    <SegmentedControl
-                        size="xs"
-                        value={sortMode}
-                        onChange={setSortMode}
-                        data={[
-                            { label: '기본', value: 'default' },
-                            { label: 'Z-score', value: 'zscore' },
-                            { label: 'Peak', value: 'peak' },
-                        ]}
-                        className="flex-shrink-0"
-                    />
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        <CopyButton value={copyText} timeout={1500}>
+                            {({ copied, copy }) => (
+                                <Button size="xs" variant="light" color={copied ? 'blue' : 'gray'} onClick={copy}>
+                                    {copied ? '복사됨' : '복사'}
+                                </Button>
+                            )}
+                        </CopyButton>
+                        <SegmentedControl
+                            size="xs"
+                            value={sortMode}
+                            onChange={setSortMode}
+                            data={[
+                                { label: '기본', value: 'default' },
+                                { label: 'Z-score', value: 'zscore' },
+                                { label: 'Peak', value: 'peak' },
+                            ]}
+                        />
+                    </div>
                 )}
             </div>
             <div style={{ height: '800px' }}>
