@@ -495,7 +495,7 @@ def main():
     ap.add_argument(
         "--input",
         required=True,
-        help="JSON 파일 경로 (extract_event.rs가 생성한 JSON 파일)",
+        help="JSON 파일 경로 또는 디렉토리 경로 (extract_event.rs가 생성한 JSON 파일)",
     )
     ap.add_argument(
         "--engine", default=None, choices=sorted(engines.keys()), help="프리셋 엔진"
@@ -512,7 +512,7 @@ def main():
         choices=["fast"],
         help="fast 프리셋 사용 (기본값: gemini25)",
     )
-    ap.add_argument("--threads", type=int, default=12, help="동시 호출 개수(병렬)")
+    ap.add_argument("--threads", type=int, default=6, help="동시 호출 개수(병렬)")
     ap.add_argument("--max_tokens", type=int, default=256)
     ap.add_argument("--temperature", type=float, default=0.2)
     ap.add_argument("--timeout", type=float, default=60.0)
@@ -569,15 +569,6 @@ def main():
     if args.denoise:
         do_denoise = True
 
-    # JSON 파일 검증
-    if not os.path.isfile(args.input):
-        print(f"오류: '{args.input}'는 유효한 파일이 아닙니다.")
-        return
-
-    if not args.input.endswith(".json"):
-        print(f"오류: .json 파일이 필요합니다.")
-        return
-
     # 모델 선택 (단일 모델만 사용)
     if args.models:
         model = args.models[0]
@@ -588,34 +579,83 @@ def main():
     else:
         model = engines["gemini25"]
 
-    # 기본 denoise 설정
-    do_denoise = True
-    if args.no_denoise:
-        do_denoise = False
-    if args.denoise:
-        do_denoise = True
+    # 입력이 파일인지 디렉토리인지 확인
+    input_path = args.input
+    if os.path.isfile(input_path):
+        # 단일 파일 처리
+        if not input_path.endswith(".json"):
+            print(f"오류: .json 파일이 필요합니다.")
+            return
 
-    result = process_json_file(
-        args.input,
-        model,
-        args.max_tokens,
-        args.temperature,
-        args.timeout,
-        args.reasoning,
-        args.retry_on_bad_format,
-        do_denoise,
-        args.dedup_run_min,
-        args.max_lines,
-        args.threads,
-        args.output_dir,
-        args.remove_emoticons,
-    )
-    if result.get("skipped"):
-        print(f"건너뜀 (이미 존재): {result['input_path']} -> {result['output_path']}")
-        print(f"이벤트 수: {result['events_processed']}")
+        result = process_json_file(
+            input_path,
+            model,
+            args.max_tokens,
+            args.temperature,
+            args.timeout,
+            args.reasoning,
+            args.retry_on_bad_format,
+            do_denoise,
+            args.dedup_run_min,
+            args.max_lines,
+            args.threads,
+            args.output_dir,
+            args.remove_emoticons,
+        )
+        if result.get("skipped"):
+            print(
+                f"건너뜀 (이미 존재): {result['input_path']} -> {result['output_path']}"
+            )
+            print(f"이벤트 수: {result['events_processed']}")
+        else:
+            print(f"처리 완료: {result['input_path']} -> {result['output_path']}")
+            print(f"처리된 이벤트 수: {result['events_processed']}")
+    elif os.path.isdir(input_path):
+        # 디렉토리 처리
+        file_list = [
+            f
+            for f in os.listdir(input_path)
+            if os.path.isfile(os.path.join(input_path, f)) and f.endswith(".json")
+        ]
+        file_list.sort()  # 파일명 순으로 정렬
+
+        if not file_list:
+            print(f"경고: 디렉토리 '{input_path}'에 .json 파일이 없습니다.")
+            return
+
+        def process_single_json(json_file: str):
+            json_path = os.path.join(input_path, json_file)
+            return process_json_file(
+                json_path,
+                model,
+                args.max_tokens,
+                args.temperature,
+                args.timeout,
+                args.reasoning,
+                args.retry_on_bad_format,
+                do_denoise,
+                args.dedup_run_min,
+                args.max_lines,
+                args.threads,
+                args.output_dir,
+                args.remove_emoticons,
+            )
+
+        # 순차 처리 (병렬 처리 대신 하나씩 처리)
+        for json_file in file_list:
+            result = process_single_json(json_file)
+            if result.get("skipped"):
+                print(
+                    f"건너뜀 (이미 존재): {result['input_path']} -> {result['output_path']}"
+                )
+                print(f"이벤트 수: {result['events_processed']}")
+            else:
+                print(f"처리 완료: {result['input_path']} -> {result['output_path']}")
+                print(f"처리된 이벤트 수: {result['events_processed']}")
+            print()  # 파일 간 구분을 위한 빈 줄
     else:
-        print(f"처리 완료: {result['input_path']} -> {result['output_path']}")
-        print(f"처리된 이벤트 수: {result['events_processed']}")
+        print(f"오류: '{input_path}'는 유효한 파일 또는 디렉토리가 아닙니다.")
+        return
 
 
 if __name__ == "__main__":
