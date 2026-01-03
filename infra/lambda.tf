@@ -69,5 +69,5 @@ resource "aws_lambda_function" "extract-chat-from-video" {
     }
   }
 
-  reserved_concurrent_executions = 4
+  reserved_concurrent_executions = 10
 }
