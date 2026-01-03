@@ -25,6 +25,7 @@ pub struct VideoChatTimeline {
     /// 첫 메시지 시간 (ISO 8601 형식)
     pub start_time: String,
     /// 타임라인 데이터 (10분 단위)
+    #[serde(skip)]
     pub timeline: Vec<TimelineEntry>,
 }
 
