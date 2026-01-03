@@ -40,7 +40,7 @@ variable "channels_json_url" {
 
 resource "aws_scheduler_schedule" "queueing-videos_schedule" {
   name                = "${var.project}-queueing-videos-schedule"
-  schedule_expression = "rate(24 hour)"
+  schedule_expression = "rate(6 hour)"
 
   flexible_time_window { mode = "OFF" }
 
