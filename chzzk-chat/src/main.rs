@@ -103,7 +103,7 @@ async fn run_analysis_chat(opts: &AnalysisChatOpt) -> Result<()> {
         }
     }
 
-    run_channel_distance_analysis(&channels, &chat_logs)?;
+    run_channel_distance_analysis(&channels, &chat_logs, opts.enable_experimental)?;
 
     if opts.enable_experimental {
         run_cluster_similar_replays(&channels, &chat_logs);
@@ -154,6 +154,7 @@ pub fn load_channels_and_chat_logs(
 fn run_channel_distance_analysis(
     channels: &[ChannelWithReplays],
     chat_logs: &[ChatLog],
+    enable_experimental: bool,
 ) -> Result<()> {
     // 채널 간 distance 계산
     utils::log("채널 간 거리 계산 중...");
@@ -177,7 +178,9 @@ fn run_channel_distance_analysis(
     utils::log(format!("계산된 채널 링크 수: {}", links.len()));
 
     // 채널별로 가장 가까운 채널 상위 5개 출력
-    data::chat::print_top_closest_channels(&nodes, &links);
+    if enable_experimental {
+        data::chat::print_top_closest_channels(&nodes, &links);
+    }
 
     Ok(())
 }
@@ -197,6 +200,7 @@ fn run_find_related_replays(channels: &[ChannelWithReplays], chat_logs: &[ChatLo
     data::video_analyzer::export_video_relations_json(
         &all_relations,
         "../web/public/video_related.json",
+        20,
     )?;
 
     // 전체 분석 결과 요약 출력
