@@ -21,8 +21,10 @@ pub struct VideoRelation {
     /// 겹치는 유저 수
     pub shared_users: usize,
     /// 비디오 제목
+    #[serde(skip)]
     pub title: String,
     /// 채널 이름
+    #[serde(skip)]
     pub channel_name: String,
 }
 
@@ -468,6 +470,7 @@ pub fn print_all_video_relations(
 pub fn export_video_relations_json<P: AsRef<Path>>(
     all_relations: &HashMap<u64, Vec<VideoRelation>>,
     output_path: P,
+    max_relations_per_video: usize,
 ) -> Result<()> {
     use crate::utils;
 
@@ -480,7 +483,16 @@ pub fn export_video_relations_json<P: AsRef<Path>>(
     // 각 비디오별로 연관 비디오 리스트를 포함하는 구조
     let json_data: HashMap<String, Vec<VideoRelation>> = all_relations
         .iter()
-        .map(|(video_no, relations)| (video_no.to_string(), relations.clone()))
+        .map(|(video_no, relations)| {
+            (
+                video_no.to_string(),
+                relations
+                    .iter()
+                    .take(max_relations_per_video)
+                    .cloned()
+                    .collect(),
+            )
+        })
         .collect();
 
     // JSON 파일로 저장
