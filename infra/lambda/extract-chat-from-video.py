@@ -3,7 +3,6 @@ import os
 import time
 import urllib.request
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 import boto3
 
 s3 = boto3.client("s3")
@@ -65,10 +64,12 @@ def _safe_nickname(profile_value) -> str:
     return "Unknown"
 
 
-def _write_chatlog_to_tmp(video_id: str, tmp_path: Path) -> dict:
+def _upload_chatlog_to_s3(video_id: str, bucket: str, key: str) -> dict:
     """
-    CHZZK API를 페이지네이션으로 호출해서 chatLog-*.log를 생성한다.
-    반환값에는 pages/lines 같은 통계를 담는다.
+    CHZZK API를 페이지네이션으로 호출해서 chatLog를 생성하고,
+    /tmp 파일 없이 S3로 바로 스트리밍 업로드한다(멀티파트 업로드).
+
+    반환값에는 pages/lines/bytes 같은 통계를 담는다.
     """
     user_agent = os.environ.get(
         "CHZZK_USER_AGENT",
@@ -79,13 +80,33 @@ def _write_chatlog_to_tmp(video_id: str, tmp_path: Path) -> dict:
     delay_ms = _env_int("CHZZK_PAGE_DELAY_MS", 100)
     delay_sec = max(0.0, delay_ms / 1000.0)
 
+    # 멀티파트 최소 파트 사이즈는 5MB (마지막 파트는 예외)
+    part_size_mb = _env_int("CHATLOG_PART_SIZE_MB", 8)
+    part_size_mb = max(part_size_mb, 5)
+    part_size = part_size_mb * 1024 * 1024
+
     next_player_message_time = "0"
     pages = 0
     lines = 0
     last_next = None
     kst = timezone(timedelta(hours=9))
+    total_bytes = 0
 
-    with tmp_path.open("w", encoding="utf-8") as f:
+    upload_id = None
+    parts: list[dict] = []
+    buffer = bytearray()
+    part_number = 1
+
+    try:
+        # 일단 멀티파트를 열어두고(로그가 작아도 비용은 크지 않음),
+        # 첫 파트가 끝까지 안 찰 정도로 작으면 complete 대신 put_object로 전환.
+        mp = s3.create_multipart_upload(
+            Bucket=bucket,
+            Key=key,
+            ContentType="text/plain; charset=utf-8",
+        )
+        upload_id = mp["UploadId"]
+
         while True:
             if pages >= max_pages:
                 raise RuntimeError(
@@ -102,7 +123,6 @@ def _write_chatlog_to_tmp(video_id: str, tmp_path: Path) -> dict:
             data = _download_json(url, timeout_sec=timeout_sec, user_agent=user_agent)
 
             if data.get("code") != 200:
-                # 200이 아니면 더 진행해도 의미가 없으니 중단
                 break
 
             content = (
@@ -124,10 +144,10 @@ def _write_chatlog_to_tmp(video_id: str, tmp_path: Path) -> dict:
                     timestamp = float(message_time) / 1000.0
                 except (TypeError, ValueError):
                     continue
+
                 formatted_time = datetime.fromtimestamp(timestamp, kst).strftime(
                     "%Y-%m-%d %H:%M:%S"
                 )
-
                 nickname = _safe_nickname(chat.get("profile"))
                 user_id_hash = str(chat.get("userIdHash", "")).strip()
                 text = (
@@ -137,8 +157,28 @@ def _write_chatlog_to_tmp(video_id: str, tmp_path: Path) -> dict:
                     .strip()
                 )
 
-                f.write(f"[{formatted_time}] {nickname}: {text} ({user_id_hash})\n")
+                line = (
+                    f"[{formatted_time}] {nickname}: {text} ({user_id_hash})\n".encode(
+                        "utf-8"
+                    )
+                )
+                buffer.extend(line)
+                total_bytes += len(line)
                 lines += 1
+
+                # 파트 업로드(버퍼가 충분히 찼을 때)
+                while len(buffer) >= part_size:
+                    chunk = bytes(buffer[:part_size])
+                    del buffer[:part_size]
+                    resp = s3.upload_part(
+                        Bucket=bucket,
+                        Key=key,
+                        UploadId=upload_id,
+                        PartNumber=part_number,
+                        Body=chunk,
+                    )
+                    parts.append({"ETag": resp["ETag"], "PartNumber": part_number})
+                    part_number += 1
 
             pages += 1
             last_next = next_player_message_time
@@ -149,7 +189,44 @@ def _write_chatlog_to_tmp(video_id: str, tmp_path: Path) -> dict:
             if not next_player_message_time or next_player_message_time == last_next:
                 break
 
-    return {"pages": pages, "lines": lines}
+        # 업로드 종료 처리
+        if not parts:
+            # 전체가 5MB 미만이면 멀티파트 대신 put_object가 더 단순
+            s3.abort_multipart_upload(Bucket=bucket, Key=key, UploadId=upload_id)
+            upload_id = None
+            s3.put_object(
+                Bucket=bucket,
+                Key=key,
+                Body=bytes(buffer),
+                ContentType="text/plain; charset=utf-8",
+            )
+        else:
+            # 마지막 파트(5MB 미만 가능)
+            if buffer:
+                resp = s3.upload_part(
+                    Bucket=bucket,
+                    Key=key,
+                    UploadId=upload_id,
+                    PartNumber=part_number,
+                    Body=bytes(buffer),
+                )
+                parts.append({"ETag": resp["ETag"], "PartNumber": part_number})
+
+            s3.complete_multipart_upload(
+                Bucket=bucket,
+                Key=key,
+                UploadId=upload_id,
+                MultipartUpload={"Parts": parts},
+            )
+
+        return {"pages": pages, "lines": lines, "bytes": total_bytes}
+    except Exception:
+        if upload_id:
+            try:
+                s3.abort_multipart_upload(Bucket=bucket, Key=key, UploadId=upload_id)
+            except Exception:
+                pass
+        raise
 
 
 def handler(event, context):
@@ -171,30 +248,15 @@ def handler(event, context):
     out_bucket, out_prefix = _get_output_target(msg)
     key = f"{out_prefix}chatLog-{video_id}.log"
 
-    tmp_path = Path("/tmp") / f"chatLog-{video_id}.log"
+    stats = _upload_chatlog_to_s3(video_id, out_bucket, key)
 
-    try:
-        stats = _write_chatlog_to_tmp(video_id, tmp_path)
-
-        s3.upload_file(
-            str(tmp_path),
-            out_bucket,
-            key,
-            ExtraArgs={"ContentType": "text/plain; charset=utf-8"},
-        )
-
-        return {
-            "ok": True,
-            "video_id": video_id,
-            "bucket": out_bucket,
-            "key": key,
-            "pages": stats["pages"],
-            "lines": stats["lines"],
-            "uploaded_at_utc": datetime.now(timezone.utc).isoformat(),
-        }
-    finally:
-        # Lambda /tmp 정리(성공/실패 모두)
-        try:
-            tmp_path.unlink(missing_ok=True)
-        except Exception:
-            pass
+    return {
+        "ok": True,
+        "video_id": video_id,
+        "bucket": out_bucket,
+        "key": key,
+        "pages": stats["pages"],
+        "lines": stats["lines"],
+        "bytes": stats["bytes"],
+        "uploaded_at_utc": datetime.now(timezone.utc).isoformat(),
+    }
