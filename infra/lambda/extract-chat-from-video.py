@@ -172,21 +172,29 @@ def handler(event, context):
     key = f"{out_prefix}chatLog-{video_id}.log"
 
     tmp_path = Path("/tmp") / f"chatLog-{video_id}.log"
-    stats = _write_chatlog_to_tmp(video_id, tmp_path)
 
-    s3.upload_file(
-        str(tmp_path),
-        out_bucket,
-        key,
-        ExtraArgs={"ContentType": "text/plain; charset=utf-8"},
-    )
+    try:
+        stats = _write_chatlog_to_tmp(video_id, tmp_path)
 
-    return {
-        "ok": True,
-        "video_id": video_id,
-        "bucket": out_bucket,
-        "key": key,
-        "pages": stats["pages"],
-        "lines": stats["lines"],
-        "uploaded_at_utc": datetime.now(timezone.utc).isoformat(),
-    }
+        s3.upload_file(
+            str(tmp_path),
+            out_bucket,
+            key,
+            ExtraArgs={"ContentType": "text/plain; charset=utf-8"},
+        )
+
+        return {
+            "ok": True,
+            "video_id": video_id,
+            "bucket": out_bucket,
+            "key": key,
+            "pages": stats["pages"],
+            "lines": stats["lines"],
+            "uploaded_at_utc": datetime.now(timezone.utc).isoformat(),
+        }
+    finally:
+        # Lambda /tmp 정리(성공/실패 모두)
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
