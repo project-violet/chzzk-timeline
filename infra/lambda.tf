@@ -18,6 +18,10 @@ resource "aws_lambda_function" "s3-lists" {
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
 
   timeout = 900
+
+  tracing_config {
+    mode = "Active"
+  }
 }
 
 # Queueing Videos
@@ -37,6 +41,10 @@ resource "aws_lambda_function" "queueing-videos" {
     variables = {
       RECENT_DAYS = 7
     }
+  }
+
+  tracing_config {
+    mode = "Active"
   }
 }
 
@@ -58,6 +66,8 @@ resource "aws_lambda_function" "extract-chat-from-video" {
   timeout     = 900
   memory_size = 512
 
+  reserved_concurrent_executions = 10
+
   environment {
     variables = {
       CHATLOG_BUCKET      = "chzzk-chats-bucket"
@@ -69,5 +79,7 @@ resource "aws_lambda_function" "extract-chat-from-video" {
     }
   }
 
-  reserved_concurrent_executions = 10
+  tracing_config {
+    mode = "Active"
+  }
 }
